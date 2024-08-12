@@ -1,0 +1,23 @@
+{{block "collections" .}}
+<div id="collection-list">
+    {{range .Data.Collections}}
+
+    {{template "collection" .}}
+
+    {{end}}
+</div>
+{{end}}
+
+{{block "collection" .}}
+<div class="collection-div u-max-full-width">
+    <span>{{.Name}}</span>
+    <br>
+    <span>Número de libros: {{.ContainedBooks}}</span>
+</div>
+{{end}}
+
+{{block "collection-oob" .}}
+<div id="collection-list" hx-swap-oob="afterbegin">
+    {{template "collection" .}}
+</div>
+{{end}}

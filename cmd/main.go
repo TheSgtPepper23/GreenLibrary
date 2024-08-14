@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/TheSgtPepper23/GreenLibrary/db"
 	"github.com/TheSgtPepper23/GreenLibrary/models"
@@ -64,7 +65,7 @@ func main() {
 			return c.JSON(400, nil)
 		}
 
-		return c.JSON(200, nil)
+		return c.JSON(200, data)
 	})
 
 	collServices.GET("", func(c echo.Context) error {
@@ -89,5 +90,42 @@ func main() {
 		}
 		return c.JSON(200, data)
 	})
+
+	bookServices.PUT("", func(c echo.Context) error {
+		data := new(models.Book)
+		if err := c.Bind(data); err != nil {
+			return c.JSON(400, nil)
+		}
+
+		err = bookDB.UpdateBook(data)
+		if err != nil {
+			return c.JSON(422, nil)
+		}
+		return c.JSON(200, data)
+	})
+
+	bookServices.GET("", func(c echo.Context) error {
+		books, err := bookDB.GetBooks()
+		if err != nil {
+			return c.JSON(500, nil)
+		}
+		return c.JSON(200, books)
+	})
+
+	bookServices.GET("/:collection", func(c echo.Context) error {
+		stringID := c.Param("collection")
+		intID, err := strconv.Atoi(stringID)
+
+		if err != nil {
+			return c.JSON(400, nil)
+		}
+
+		books, err := bookDB.GetBookOfCollection(intID)
+		if err != nil {
+			return c.JSON(500, nil)
+		}
+		return c.JSON(200, books)
+	})
+
 	server.Logger.Fatal(server.Start(":5555"))
 }

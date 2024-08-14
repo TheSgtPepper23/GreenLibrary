@@ -67,7 +67,8 @@ func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
 
 	for rows.Next() {
 		var collection models.Collection
-		err := rows.Scan(&collection.ID, &collection.Name, &collection.CreationDate, &collection.ContainedBooks)
+		err := rows.Scan(&collection.ID, &collection.Name,
+			&collection.CreationDate, &collection.ContainedBooks)
 		if err != nil {
 			return nil, err
 		}

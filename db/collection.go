@@ -17,11 +17,18 @@ func NewSQLCollectionContext(pool *pgxpool.Pool) *CollectionSQLContext {
 		conn: pool,
 	}
 }
-func (c *CollectionSQLContext) SQLCreateCollection(collection *models.Collection) error {
+
+func (c *CollectionSQLContext) SQLCreateCollection(collection *models.Collection) (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
-	_, err := c.conn.Exec(ctx, "INSERT INTO public.collection (name, creation_date) VALUES ($1, $2)", collection.Name, collection.CreationDate)
-	return err
+	var newID int
+	err := c.conn.QueryRow(ctx, "INSERT INTO public.collection (name, creation_date) VALUES ($1, $2) RETURNING id", collection.Name, collection.CreationDate).Scan(newID)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return newID, nil
 }
 
 func (c *CollectionSQLContext) SQLUpdateCollection(collection *models.Collection) error {

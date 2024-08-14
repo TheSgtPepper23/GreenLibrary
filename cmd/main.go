@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/TheSgtPepper23/GreenLibrary/db"
+	"github.com/TheSgtPepper23/GreenLibrary/models"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -18,12 +19,6 @@ func main() {
 	server.Use(middleware.Logger())
 	server.Use(middleware.Recover())
 
-	// server.Renderer = models.NewTemplate()
-
-	// server.Static("/static", "static")
-
-	// ctx := models.NewContext()
-
 	conn, err := db.GetConnection()
 	if err != nil {
 		server.StdLogger.Fatal()
@@ -31,10 +26,41 @@ func main() {
 
 	defer conn.Close()
 
-	sqlCollection := db.NewSQLCollectionContext(conn)
+	collDB := db.NewSQLCollectionContext(conn)
+	bookDB := db.NewSQLBookContext(conn)
 
-	server.GET("/collections", func(c echo.Context) error {
-		collections, err := sqlCollection.SQLRetrieveCollections()
+	server.POST("/collection", func(c echo.Context) error {
+		data := new(models.Collection)
+		if err := c.Bind(data); err != nil {
+			return c.JSON(400, nil)
+		}
+
+		data.ID, err = collDB.SQLCreateCollection(data)
+
+		if err != nil {
+			return c.JSON(422, nil)
+		}
+
+		return c.JSON(200, data)
+	})
+
+	server.PUT("/collection", func(c echo.Context) error {
+		data := new(models.Collection)
+		if err := c.Bind(data); err != nil {
+			return c.JSON(400, nil)
+		}
+
+		err := collDB.SQLUpdateCollection(data)
+
+		if err != nil {
+			return c.JSON(400, nil)
+		}
+
+		return c.JSON(200, nil)
+	})
+
+	server.GET("/collection", func(c echo.Context) error {
+		collections, err := collDB.SQLRetrieveCollections()
 		if err != nil {
 			server.Logger.Print(err.Error())
 			return c.JSON(400, nil)
@@ -42,38 +68,17 @@ func main() {
 		return c.JSON(200, collections)
 	})
 
-	// server.GET("/", func(c echo.Context) error {
-	// 	collections, err := sqlCollection.SQLRetrieveCollections()
-	// 	if err != nil {
-	// 		server.Logger.Print(err.Error())
-	// 		return c.Render(400, "index", 1)
-	// 	}
+	server.POST("/book", func(c echo.Context) error {
+		data := new(models.Book)
+		if err := c.Bind(data); err != nil {
+			return c.JSON(400, nil)
+		}
 
-	// 	ctx.Data = models.MainResponse{
-	// 		Collections: collections,
-	// 		Books:       &[]models.Book{},
-	// 	}
-	// 	return c.Render(200, "index", ctx)
-	// })
-
-	// server.POST("/collection", func(c echo.Context) error {
-	// 	temp := models.Collection{
-	// 		Name:         c.FormValue("name"),
-	// 		CreationDate: time.Now(),
-	// 	}
-	// 	sqlCollection.SQLCreateCollection(&temp)
-
-	// 	return c.Render(200, "collection-oob", temp)
-	// })
-
-	// server.GET("/book", func(c echo.Context) error {
-	// 	books, err := services.SearchBook(c.FormValue("title"))
-	// 	if err != nil {
-	// 		return c.Render(400, "index", 1)
-	// 	}
-	// 	ctx.Data.ChangeBooks(books)
-	// 	return c.Render(200, "books", ctx)
-	// })
-
+		data.ID, err = bookDB.CreateNewBook(data)
+		if err != nil {
+			return c.JSON(422, nil)
+		}
+		return c.JSON(200, data)
+	})
 	server.Logger.Fatal(server.Start(":5555"))
 }

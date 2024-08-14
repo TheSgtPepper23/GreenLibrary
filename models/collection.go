@@ -5,8 +5,8 @@ import (
 )
 
 type Collection struct {
-	ID             int
-	Name           string
-	CreationDate   time.Time
-	ContainedBooks int
+	ID             int       `json:"id"`
+	Name           string    `json:"name"`
+	CreationDate   time.Time `json:"creationDate"`
+	ContainedBooks int       `json:"containedBooks"`
 }

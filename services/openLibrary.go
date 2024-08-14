@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"unicode"
 
@@ -30,7 +31,8 @@ func SearchBook(bookTitle string) (*[]models.Book, error) {
 	bookTitle = normalizeString(bookTitle)
 	bookTitle = strings.Replace(bookTitle, " ", "+", -1)
 	foundBooks := []models.Book{}
-	resp, err := http.Get("https://openlibrary.org/search.json?q=" + bookTitle)
+	resp, err := http.Get(os.Getenv("OPEN_LIBRARY_URL") + bookTitle)
+	baseImage := os.Getenv("IMAGE_URL")
 
 	if err != nil {
 		return nil, err
@@ -43,23 +45,38 @@ func SearchBook(bookTitle string) (*[]models.Book, error) {
 		return nil, err
 	}
 
-	fmt.Println(response.Docs)
-
 	for i := 0; i < len(response.Docs); i++ {
 		currentDoc := response.Docs[i]
+		imgURL := buildImageURL(currentDoc.CoverEditinoKey, baseImage)
+
+		authorName := "Unknown"
+		if len(currentDoc.AuthorName) > 0 {
+			authorName = currentDoc.AuthorName[0]
+		}
+
+		authorKey := ""
+		if len(currentDoc.AuthorKey) > 0 {
+			authorKey = currentDoc.AuthorKey[0]
+		}
+
 		var tempBook = models.Book{
 			Title:       currentDoc.Title,
-			Author:      currentDoc.AuthorName[0],
+			Author:      authorName,
 			Key:         currentDoc.CoverEditinoKey,
-			AuthorKey:   currentDoc.AuthorKey[0],
+			AuthorKey:   authorKey,
 			ReleaseYear: currentDoc.FirstPulishYear,
 			AVGRating:   currentDoc.AvgRating,
 			PageCount:   currentDoc.NumberOfPages,
+			CoverURL:    imgURL,
 		}
 		foundBooks = append(foundBooks, tempBook)
 	}
 
 	return &foundBooks, nil
+}
+
+func buildImageURL(key, baseURL string) string {
+	return fmt.Sprint(baseURL, key, "-", "M", ".jpg")
 }
 
 func normalizeString(original string) string {

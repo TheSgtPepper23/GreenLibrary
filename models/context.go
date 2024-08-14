@@ -11,5 +11,9 @@ func NewContext() *ServerContext {
 	allowCreate := os.Getenv("ALLOW_CREATION")
 	return &ServerContext{
 		AllowCreation: allowCreate == "1",
+		Data: MainResponse{
+			Collections: &[]Collection{},
+			Books:       &[]Book{},
+		},
 	}
 }

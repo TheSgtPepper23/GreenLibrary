@@ -29,8 +29,8 @@
         </div>
         <div class="row">
             <div class="twelve columns">
-                <form action="" class="horizontal-form">
-                    <input type="text" class="u-full-width" id="search-bar" placeholder="Buscar...">
+                <form hx-get="/book" class="horizontal-form" hx-target="#book-list" hx-swap="outerHTML">
+                    <input name="title" type="text" class="u-full-width" id="search-bar" placeholder="Buscar...">
                     <button type="submit" class="button-primary">Buscar</button>
                 </form>
             </div>
@@ -61,9 +61,7 @@
                 <div>
                     <h4>Libros</h4>
                 </div>
-                <div>
-
-                </div>
+                {{ template "books" .}}
             </div>
         </div>
     </div>

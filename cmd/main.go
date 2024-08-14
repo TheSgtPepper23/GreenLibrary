@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
 
 	"github.com/TheSgtPepper23/GreenLibrary/db"
 	"github.com/TheSgtPepper23/GreenLibrary/models"
@@ -29,13 +31,19 @@ func main() {
 	collDB := db.NewSQLCollectionContext(conn)
 	bookDB := db.NewSQLBookContext(conn)
 
-	server.POST("/collection", func(c echo.Context) error {
+	collServices := server.Group("/collection")
+	bookServices := server.Group("/book")
+	secret := os.Getenv("SECRET")
+	// collServices.Use(echojwt.JWT([]byte(secret)))
+	// bookServices.Use(echojwt.JWT([]byte(secret)))
+
+	collServices.POST("", func(c echo.Context) error {
 		data := new(models.Collection)
 		if err := c.Bind(data); err != nil {
 			return c.JSON(400, nil)
 		}
 
-		data.ID, err = collDB.SQLCreateCollection(data)
+		data.ID, err = collDB.CreateCollection(data)
 
 		if err != nil {
 			return c.JSON(422, nil)
@@ -44,13 +52,13 @@ func main() {
 		return c.JSON(200, data)
 	})
 
-	server.PUT("/collection", func(c echo.Context) error {
+	collServices.PUT("", func(c echo.Context) error {
 		data := new(models.Collection)
 		if err := c.Bind(data); err != nil {
 			return c.JSON(400, nil)
 		}
 
-		err := collDB.SQLUpdateCollection(data)
+		err := collDB.UpdateCollection(data)
 
 		if err != nil {
 			return c.JSON(400, nil)
@@ -59,8 +67,9 @@ func main() {
 		return c.JSON(200, nil)
 	})
 
-	server.GET("/collection", func(c echo.Context) error {
-		collections, err := collDB.SQLRetrieveCollections()
+	collServices.GET("", func(c echo.Context) error {
+		collections, err := collDB.GetCollections()
+		fmt.Println(secret)
 		if err != nil {
 			server.Logger.Print(err.Error())
 			return c.JSON(400, nil)
@@ -68,7 +77,7 @@ func main() {
 		return c.JSON(200, collections)
 	})
 
-	server.POST("/book", func(c echo.Context) error {
+	bookServices.POST("", func(c echo.Context) error {
 		data := new(models.Book)
 		if err := c.Bind(data); err != nil {
 			return c.JSON(400, nil)

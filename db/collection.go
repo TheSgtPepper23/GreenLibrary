@@ -18,11 +18,14 @@ func NewSQLCollectionContext(pool *pgxpool.Pool) *CollectionSQLContext {
 	}
 }
 
-func (c *CollectionSQLContext) SQLCreateCollection(collection *models.Collection) (int, error) {
+func (c *CollectionSQLContext) CreateCollection(collection *models.Collection) (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 	var newID int
-	err := c.conn.QueryRow(ctx, "INSERT INTO public.collection (name, creation_date) VALUES ($1, $2) RETURNING id", collection.Name, collection.CreationDate).Scan(newID)
+	err := c.conn.QueryRow(ctx, `INSERT INTO public.collection (
+		name, 
+		creation_date) 
+		VALUES ($1, $2) RETURNING id`, collection.Name, collection.CreationDate).Scan(newID)
 
 	if err != nil {
 		return 0, err
@@ -31,20 +34,32 @@ func (c *CollectionSQLContext) SQLCreateCollection(collection *models.Collection
 	return newID, nil
 }
 
-func (c *CollectionSQLContext) SQLUpdateCollection(collection *models.Collection) error {
+func (c *CollectionSQLContext) UpdateCollection(collection *models.Collection) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
-	_, err := c.conn.Exec(ctx, "UPDATE public.collection SET name = $1, creation_date= $2 WHERE id=$3;", collection.Name, collection.CreationDate, collection.ID)
+	_, err := c.conn.Exec(ctx, `UPDATE 
+		public.collection 
+		SET name = $1, 
+		creation_date= $2 
+		WHERE id=$3;`, collection.Name, collection.CreationDate, collection.ID)
 	return err
 }
 
-func (c *CollectionSQLContext) SQLRetrieveCollections() (*[]models.Collection, error) {
+func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
 	var collections []models.Collection
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
-	rows, err := c.conn.Query(ctx, "SELECT c.id, c.name, c.creation_date, COUNT(b.id) as count FROM public.collection c LEFT JOIN public.book b on b.id = c.id  GROUP BY c.id, c.name ORDER BY c.creation_date desc")
+	rows, err := c.conn.Query(ctx, `SELECT 
+		c.id, 
+		c.name, 
+		c.creation_date, 
+		COUNT(b.id) as count 
+		FROM public.collection c LEFT JOIN public.book b 
+		on b.id = c.id  
+		GROUP BY c.id, c.name 
+		ORDER BY c.creation_date desc`)
 	if err != nil {
 		return nil, err
 	}

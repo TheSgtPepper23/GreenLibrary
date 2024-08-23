@@ -5,33 +5,36 @@ import (
 	"time"
 
 	"github.com/TheSgtPepper23/GreenLibrary/models"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/TheSgtPepper23/GreenLibrary/services"
 )
 
 type CollectionSQLContext struct {
-	conn *pgxpool.Pool
+	conn Database
 }
 
-func NewSQLCollectionContext(pool *pgxpool.Pool) *CollectionSQLContext {
+func NewSQLCollectionContext(pool Database) *CollectionSQLContext {
 	return &CollectionSQLContext{
 		conn: pool,
 	}
 }
 
-func (c *CollectionSQLContext) CreateCollection(collection *models.Collection) (int, error) {
+func (c *CollectionSQLContext) CreateCollection(collection *models.Collection) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
-	var newID int
-	err := c.conn.QueryRow(ctx, `INSERT INTO public.collection (
+	collection.ID = services.GenerateUUID()
+	collection.CreationDate = time.Now()
+	_, err := c.conn.Exec(ctx, `INSERT INTO public.collection (
+		id,
 		name, 
-		creation_date) 
-		VALUES ($1, $2) RETURNING id`, collection.Name, collection.CreationDate).Scan(newID)
+		creation_date,
+		owner_id) 
+		VALUES ($1, $2, $3, $4) RETURNING id`, collection.ID, collection.Name, collection.CreationDate, collection.OwnerID)
 
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return newID, nil
+	return nil
 }
 
 func (c *CollectionSQLContext) UpdateCollection(collection *models.Collection) error {
@@ -40,8 +43,7 @@ func (c *CollectionSQLContext) UpdateCollection(collection *models.Collection) e
 	_, err := c.conn.Exec(ctx, `UPDATE 
 		public.collection 
 		SET name = $1, 
-		creation_date= $2 
-		WHERE id=$3;`, collection.Name, collection.CreationDate, collection.ID)
+		WHERE id=$3;`, collection.Name, collection.ID)
 	return err
 }
 
@@ -55,9 +57,10 @@ func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
 		c.id, 
 		c.name, 
 		c.creation_date, 
-		COUNT(b.id) as count 
-		FROM public.collection c LEFT JOIN public.book b 
-		on b.id = c.id  
+		c.owner_id,
+		COUNT(b.collection_id) as count 
+		FROM public.collection c LEFT JOIN public.collection_has_book b 
+		on b.collection_id = c.id  
 		GROUP BY c.id, c.name 
 		ORDER BY c.creation_date desc`)
 	if err != nil {
@@ -68,7 +71,7 @@ func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
 	for rows.Next() {
 		var collection models.Collection
 		err := rows.Scan(&collection.ID, &collection.Name,
-			&collection.CreationDate, &collection.ContainedBooks)
+			&collection.CreationDate, &collection.OwnerID, &collection.ContainedBooks)
 		if err != nil {
 			return nil, err
 		}

@@ -3,11 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/TheSgtPepper23/GreenLibrary/db"
 	"github.com/TheSgtPepper23/GreenLibrary/models"
+	"github.com/TheSgtPepper23/GreenLibrary/services"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -22,6 +23,14 @@ func main() {
 	server.Use(middleware.Logger())
 	server.Use(middleware.Recover())
 
+	//TODO quitar las líneas de abajo, a la hora de desplegarlo se usará un reverse proxy
+	server.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins:     []string{"http://localhost:5173"}, // Allowed origins
+		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
+		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
+		AllowCredentials: true, // Set to true if your API requires credentials (e.g., cookies)
+	}))
+
 	conn, err := db.GetConnection()
 	if err != nil {
 		server.StdLogger.Fatal()
@@ -31,9 +40,11 @@ func main() {
 
 	collDB := db.NewSQLCollectionContext(conn)
 	bookDB := db.NewSQLBookContext(conn)
+	userDB := db.NewSQLUserContext(conn)
 
 	collServices := server.Group("/collection")
 	bookServices := server.Group("/book")
+	authServices := server.Group("/auth")
 	secret := os.Getenv("SECRET")
 	// collServices.Use(echojwt.JWT([]byte(secret)))
 	// bookServices.Use(echojwt.JWT([]byte(secret)))
@@ -44,9 +55,10 @@ func main() {
 			return c.JSON(400, nil)
 		}
 
-		data.ID, err = collDB.CreateCollection(data)
+		err = collDB.CreateCollection(data)
 
 		if err != nil {
+			fmt.Println(err.Error())
 			return c.JSON(422, nil)
 		}
 
@@ -84,8 +96,9 @@ func main() {
 			return c.JSON(400, nil)
 		}
 
-		data.ID, err = bookDB.CreateNewBook(data)
+		err = bookDB.CreateNewBook(data)
 		if err != nil {
+			fmt.Println(err.Error())
 			return c.JSON(422, nil)
 		}
 		return c.JSON(200, data)
@@ -104,28 +117,61 @@ func main() {
 		return c.JSON(200, data)
 	})
 
-	bookServices.GET("", func(c echo.Context) error {
-		books, err := bookDB.GetBooks()
-		if err != nil {
-			return c.JSON(500, nil)
-		}
-		return c.JSON(200, books)
-	})
-
 	bookServices.GET("/:collection", func(c echo.Context) error {
 		stringID := c.Param("collection")
-		intID, err := strconv.Atoi(stringID)
 
 		if err != nil {
 			return c.JSON(400, nil)
 		}
 
-		books, err := bookDB.GetBookOfCollection(intID)
+		books, err := bookDB.GetBookOfCollection(stringID)
 		if err != nil {
+			fmt.Println(err.Error())
 			return c.JSON(500, nil)
 		}
 		return c.JSON(200, books)
 	})
 
+	bookServices.POST("/search", func(c echo.Context) error {
+		data := make(map[string]string)
+		if err := c.Bind(&data); err != nil {
+			return c.JSON(400, nil)
+		}
+		results, err := services.SearchBook(data["title"])
+		if err != nil {
+			return c.JSON(400, nil)
+		}
+		return c.JSON(200, results)
+	})
+
+	authServices.POST("/login", func(c echo.Context) error {
+		userData := new(models.User)
+		err := c.Bind(userData)
+		if err != nil {
+			return c.JSON(400, nil)
+		}
+		err = userDB.AuthenticateUser(userData)
+
+		if err != nil {
+			return c.JSON(401, nil)
+		}
+
+		token, err := services.GenerateToken(userData.Email)
+
+		if err != nil {
+			return c.JSON(401, nil)
+		}
+
+		return c.JSON(200, token)
+	})
+
+	authServices.POST("/refresh", func(c echo.Context) error {
+		return c.JSON(200, nil)
+	})
+
 	server.Logger.Fatal(server.Start(":5555"))
 }
+
+//TODO probar las funciones de SQL
+//TODO Agregar un struct de respuesta estandarizada a todos los endpoints
+//TODO habilitar nuevamente la autenticación

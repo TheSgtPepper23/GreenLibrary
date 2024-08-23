@@ -31,6 +31,7 @@ func SearchBook(bookTitle string) (*[]models.Book, error) {
 	bookTitle = normalizeString(bookTitle)
 	bookTitle = strings.Replace(bookTitle, " ", "+", -1)
 	foundBooks := []models.Book{}
+
 	resp, err := http.Get(os.Getenv("OPEN_LIBRARY_URL") + bookTitle)
 	baseImage := os.Getenv("IMAGE_URL")
 
@@ -46,17 +47,19 @@ func SearchBook(bookTitle string) (*[]models.Book, error) {
 	}
 
 	for i := 0; i < len(response.Docs); i++ {
+		if response.Docs[i].CoverEditinoKey == "" {
+			continue
+		}
 		currentDoc := response.Docs[i]
-		imgURL := buildImageURL(currentDoc.CoverEditinoKey, baseImage)
 
 		authorName := "Unknown"
 		if len(currentDoc.AuthorName) > 0 {
-			authorName = currentDoc.AuthorName[0]
+			authorName = strings.Join(currentDoc.AuthorName, ", ")
 		}
 
 		authorKey := ""
 		if len(currentDoc.AuthorKey) > 0 {
-			authorKey = currentDoc.AuthorKey[0]
+			authorKey = strings.Join(currentDoc.AuthorKey, ", ")
 		}
 
 		var tempBook = models.Book{
@@ -67,7 +70,7 @@ func SearchBook(bookTitle string) (*[]models.Book, error) {
 			ReleaseYear: currentDoc.FirstPulishYear,
 			AVGRating:   currentDoc.AvgRating,
 			PageCount:   currentDoc.NumberOfPages,
-			CoverURL:    imgURL,
+			CoverURL:    buildImageURL(currentDoc.CoverEditinoKey, baseImage),
 		}
 		foundBooks = append(foundBooks, tempBook)
 	}

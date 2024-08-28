@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"github.com/TheSgtPepper23/GreenLibrary/models"
 	"github.com/TheSgtPepper23/GreenLibrary/services"
 	"github.com/joho/godotenv"
+	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -46,8 +46,8 @@ func main() {
 	bookServices := server.Group("/book")
 	authServices := server.Group("/auth")
 	secret := os.Getenv("SECRET")
-	// collServices.Use(echojwt.JWT([]byte(secret)))
-	// bookServices.Use(echojwt.JWT([]byte(secret)))
+	collServices.Use(echojwt.JWT([]byte(secret)))
+	bookServices.Use(echojwt.JWT([]byte(secret)))
 
 	collServices.POST("", func(c echo.Context) error {
 		data := new(models.Collection)
@@ -58,7 +58,6 @@ func main() {
 		err = collDB.CreateCollection(data)
 
 		if err != nil {
-			fmt.Println(err.Error())
 			return c.JSON(422, nil)
 		}
 
@@ -74,7 +73,7 @@ func main() {
 		err := collDB.UpdateCollection(data)
 
 		if err != nil {
-			return c.JSON(400, nil)
+			return c.JSON(422, nil)
 		}
 
 		return c.JSON(200, data)
@@ -82,10 +81,8 @@ func main() {
 
 	collServices.GET("", func(c echo.Context) error {
 		collections, err := collDB.GetCollections()
-		fmt.Println(secret)
 		if err != nil {
-			server.Logger.Print(err.Error())
-			return c.JSON(400, nil)
+			return c.JSON(404, nil)
 		}
 		return c.JSON(200, collections)
 	})
@@ -98,7 +95,6 @@ func main() {
 
 		err = bookDB.CreateNewBook(data)
 		if err != nil {
-			fmt.Println(err.Error())
 			return c.JSON(422, nil)
 		}
 		return c.JSON(200, data)
@@ -120,14 +116,9 @@ func main() {
 	bookServices.GET("/:collection", func(c echo.Context) error {
 		stringID := c.Param("collection")
 
+		books, err := bookDB.GetBooksOfCollection(stringID)
 		if err != nil {
-			return c.JSON(400, nil)
-		}
-
-		books, err := bookDB.GetBookOfCollection(stringID)
-		if err != nil {
-			fmt.Println(err.Error())
-			return c.JSON(500, nil)
+			return c.JSON(404, nil)
 		}
 		return c.JSON(200, books)
 	})
@@ -139,9 +130,22 @@ func main() {
 		}
 		results, err := services.SearchBook(data["title"])
 		if err != nil {
-			return c.JSON(400, nil)
+			return c.JSON(503, nil)
 		}
 		return c.JSON(200, results)
+	})
+
+	bookServices.PUT("/delete", func(c echo.Context) error {
+		data := new(models.Book)
+		if err := c.Bind(data); err != nil {
+			return c.JSON(400, nil)
+		}
+
+		err = bookDB.RemoveBookFromCollection(data)
+		if err != nil {
+			return c.JSON(422, nil)
+		}
+		return c.JSON(200, data)
 	})
 
 	authServices.POST("/login", func(c echo.Context) error {
@@ -166,12 +170,16 @@ func main() {
 	})
 
 	authServices.POST("/refresh", func(c echo.Context) error {
-		return c.JSON(200, nil)
+		token := c.Request().Header.Get("Authorization")
+		var newToken string
+		if token != "" {
+			newToken, err = services.RefreshToken(token)
+			if err != nil {
+				return c.JSON(401, nil)
+			}
+		}
+		return c.JSON(200, newToken)
 	})
 
 	server.Logger.Fatal(server.Start(":5555"))
 }
-
-//TODO probar las funciones de SQL
-//TODO Agregar un struct de respuesta estandarizada a todos los endpoints
-//TODO habilitar nuevamente la autenticación

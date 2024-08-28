@@ -23,12 +23,13 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
-	imgUrl, err := services.ProcessImage(book.CoverURL, book.Key)
+	imgUrl := book.CoverURL
+	// imgUrl, err := services.ProcessImage(book.CoverURL, book.Key)
 
-	//TODO En caso de que no la pueda descargar debe asignarle una portada generica
-	if err != nil {
-		imgUrl = book.CoverURL
-	}
+	// //TODO En caso de que no la pueda descargar debe asignarle una portada generica
+	// if err != nil {
+	// 	imgUrl = book.CoverURL
+	// }
 
 	tx, err := c.conn.Begin(context.Background())
 
@@ -106,7 +107,7 @@ func (c *BookSQLContext) UpdateBook(book *models.Book) error {
 	return err
 }
 
-func (c *BookSQLContext) GetBookOfCollection(collectionID string) (*[]models.Book, error) {
+func (c *BookSQLContext) GetBooksOfCollection(collectionID string) (*[]models.Book, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 	var books []models.Book
@@ -129,6 +130,13 @@ func (c *BookSQLContext) GetBookOfCollection(collectionID string) (*[]models.Boo
 	}
 
 	return &books, nil
+}
+
+func (c *BookSQLContext) RemoveBookFromCollection(book *models.Book) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	defer cancel()
+	_, err := c.conn.Exec(ctx, `DELETE FROM public.collection_has_book WHERE book_id = $1 AND collection_id = $2`, book.ID, book.CollecionID)
+	return err
 }
 
 func scanBooks(rows pgx.Rows, target *[]models.Book) error {

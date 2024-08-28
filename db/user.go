@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/TheSgtPepper23/GreenLibrary/models"
@@ -26,8 +27,9 @@ func (c *UserSQLContext) AuthenticateUser(user *models.User) error {
 
 	var recoveredPassword string
 
-	err := c.conn.QueryRow(ctx, `SELECT password on public.user WHERE email = $1`, user.Email).Scan(&recoveredPassword)
+	err := c.conn.QueryRow(ctx, `SELECT password FROM public.user WHERE email = $1`, strings.ToLower(user.Email)).Scan(&recoveredPassword)
 	if err != nil {
+		fmt.Println(err.Error())
 		return err
 	}
 

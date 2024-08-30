@@ -23,9 +23,8 @@ func main() {
 	server.Use(middleware.Logger())
 	server.Use(middleware.Recover())
 
-	//TODO quitar las líneas de abajo, a la hora de desplegarlo se usará un reverse proxy
 	server.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     []string{"http://localhost:5173"}, // Allowed origins
+		AllowOrigins:     []string{"http://localhost:5173", "https://andresdglez.com"}, // Allowed origins
 		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
 		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 		AllowCredentials: true, // Set to true if your API requires credentials (e.g., cookies)
@@ -48,6 +47,10 @@ func main() {
 	secret := os.Getenv("SECRET")
 	collServices.Use(echojwt.JWT([]byte(secret)))
 	bookServices.Use(echojwt.JWT([]byte(secret)))
+
+	server.GET("/ping", func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
 
 	collServices.POST("", func(c echo.Context) error {
 		data := new(models.Collection)
@@ -154,13 +157,13 @@ func main() {
 		if err != nil {
 			return c.JSON(400, nil)
 		}
-		err = userDB.AuthenticateUser(userData)
+		userKey, err := userDB.AuthenticateUser(userData)
 
 		if err != nil {
 			return c.JSON(401, nil)
 		}
 
-		token, err := services.GenerateToken(userData.Email)
+		token, err := services.GenerateToken(userData.Email, userKey)
 
 		if err != nil {
 			return c.JSON(401, nil)

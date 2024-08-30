@@ -8,20 +8,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type customClaims struct {
-	email string
-	jwt.RegisteredClaims
-}
-
-func GenerateToken(email string) (string, error) {
+func GenerateToken(email, userKey string) (string, error) {
 	var signingKey = []byte(os.Getenv("SECRET"))
 
-	claims := customClaims{
-		email,
-		jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 1)),
-			Issuer:    "GreenLibrary",
-		},
+	claims := jwt.MapClaims{
+		"email":   email,
+		"userKey": userKey,
+		"exp":     jwt.NewNumericDate(time.Now().Add(time.Hour * 1)),
+		"iss":     "GreenLibrary",
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -35,7 +29,7 @@ func GenerateToken(email string) (string, error) {
 
 func RefreshToken(tokenstring string) (string, error) {
 	var signingKey = []byte(os.Getenv("SECRET"))
-	token, err := jwt.ParseWithClaims(tokenstring, &customClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenstring, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return signingKey, nil
 	})
 
@@ -43,9 +37,11 @@ func RefreshToken(tokenstring string) (string, error) {
 		return "", err
 	}
 
-	if claims, ok := token.Claims.(*customClaims); ok && token.Valid {
-		if time.Until(claims.ExpiresAt.Time) < 10*time.Minute {
-			return GenerateToken(claims.email)
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if exp, ok := claims["exp"].(float64); ok && time.Until(time.Unix(int64(exp), 0)) < 10*time.Minute {
+			email := claims["email"].(string)
+			userKey := claims["userKey"].(string)
+			return GenerateToken(email, userKey)
 		} else {
 			return "", fmt.Errorf("token not ready to be refreshed yet")
 		}

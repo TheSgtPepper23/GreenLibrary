@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/TheSgtPepper23/GreenLibrary/models"
@@ -23,13 +24,12 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
-	imgUrl := book.CoverURL
-	// imgUrl, err := services.ProcessImage(book.CoverURL, book.Key)
+	imgUrl, err := services.ProcessImage(book.CoverURL, book.Key)
 
-	// //TODO En caso de que no la pueda descargar debe asignarle una portada generica
-	// if err != nil {
-	// 	imgUrl = book.CoverURL
-	// }
+	if err != nil {
+		fmt.Println("la imagen no se pudo guardar ", err.Error())
+		imgUrl = book.CoverURL
+	}
 
 	tx, err := c.conn.Begin(context.Background())
 
@@ -110,7 +110,7 @@ func (c *BookSQLContext) UpdateBook(book *models.Book) error {
 func (c *BookSQLContext) GetBooksOfCollection(collectionID string) (*[]models.Book, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
-	var books []models.Book
+	books := make([]models.Book, 0)
 
 	rows, err := c.conn.Query(ctx, `SELECT  b.id, b.title, b.author, b."key", b.author_key, b.release_year,
 		chb.date_added, chb.start_reading, chb.finish_reading, b.cover_url,

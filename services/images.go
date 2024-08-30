@@ -23,19 +23,16 @@ func ProcessImage(url, bookKey string) (string, error) {
 		return "", err
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	imgUrl := filepath.Join(homeDir, "images", fmt.Sprint(bookKey, ".jpg"))
+	fileName := fmt.Sprint(bookKey, ".jpg")
+	imgUrl := filepath.Join("/www", "images", fileName)
 	directory := filepath.Dir(imgUrl)
 	//crea el directorio en caso de que no exista
-	err = os.MkdirAll(directory, os.ModePerm)
+	err = os.MkdirAll(directory, 0777)
 	if err != nil {
 		return "", err
 	}
+	baseURL := os.Getenv("IMG_DIR")
 
-	return imgUrl, os.WriteFile(imgUrl, imgBytes, 0644)
+	return fmt.Sprint(baseURL, fileName), os.WriteFile(imgUrl, imgBytes, 0644)
 
 }

@@ -21,24 +21,25 @@ func NewSQLUserContext(pool Database) *UserSQLContext {
 	}
 }
 
-func (c *UserSQLContext) AuthenticateUser(user *models.User) error {
+func (c *UserSQLContext) AuthenticateUser(user *models.User) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
 	var recoveredPassword string
+	var id string
 
-	err := c.conn.QueryRow(ctx, `SELECT password FROM public.user WHERE email = $1`, strings.ToLower(user.Email)).Scan(&recoveredPassword)
+	err := c.conn.QueryRow(ctx, `SELECT id, password FROM public.user WHERE email = $1`, strings.ToLower(user.Email)).Scan(&id, &recoveredPassword)
 	if err != nil {
 		fmt.Println(err.Error())
-		return err
+		return "", err
 	}
 
 	hashedPass := hashPassword(user.Password)
 
 	if hashedPass != recoveredPassword {
-		return fmt.Errorf("passwords not match")
+		return "", fmt.Errorf("passwords not match")
 	}
-	return nil
+	return id, nil
 }
 
 func hashPassword(password string) string {

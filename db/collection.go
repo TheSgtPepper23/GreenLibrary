@@ -48,7 +48,8 @@ func (c *CollectionSQLContext) UpdateCollection(collection *models.Collection) e
 }
 
 func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
-	var collections []models.Collection
+
+	collections := make([]models.Collection, 0)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()

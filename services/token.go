@@ -29,14 +29,14 @@ func GenerateToken(email, userKey string) (string, error) {
 
 func RefreshToken(tokenstring string) (string, error) {
 	var signingKey = []byte(os.Getenv("SECRET"))
+	// remove "Bearer " from token
+	tokenstring = tokenstring[7:]
 	token, err := jwt.ParseWithClaims(tokenstring, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return signingKey, nil
 	})
-
 	if err != nil {
 		return "", err
 	}
-
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		if exp, ok := claims["exp"].(float64); ok && time.Until(time.Unix(int64(exp), 0)) < 10*time.Minute {
 			email := claims["email"].(string)

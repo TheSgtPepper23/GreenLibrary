@@ -37,8 +37,6 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book) error {
 		return err
 	}
 
-	defer tx.Rollback(context.Background())
-
 	var existingID string
 	insertNew := false
 
@@ -47,6 +45,7 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book) error {
 	if err != nil {
 		//si el error no es de tipo ErrNoRows significa que algo salió mal
 		if err != pgx.ErrNoRows {
+			tx.Rollback(context.Background())
 			return err
 		} else {
 			//si es del tipo correcto solo signigica que debe de generarse un nuevo libro
@@ -79,10 +78,12 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book) error {
 		VALUES($1, $2, $3)`, book.DateAdded, book.ID, book.CollecionID)
 
 	if err != nil {
+		tx.Rollback(context.Background())
 		return err
 	}
 
 	if err := tx.Commit(context.Background()); err != nil {
+		tx.Rollback(context.Background())
 		return err
 	}
 

@@ -42,8 +42,8 @@ func (c *CollectionSQLContext) UpdateCollection(collection *models.Collection) e
 	defer cancel()
 	_, err := c.conn.Exec(ctx, `UPDATE 
 		public.collection 
-		SET name = $1, 
-		WHERE id=$3;`, collection.Name, collection.ID)
+		SET name = $1 
+		WHERE id=$2;`, collection.Name, collection.ID)
 	return err
 }
 
@@ -80,4 +80,35 @@ func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
 	}
 
 	return &collections, nil
+}
+
+func (c *CollectionSQLContext) DeleteCollection(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	defer cancel()
+
+	tx, err := c.conn.Begin(context.Background())
+
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `DELETE FROM public.collection_has_book WHERE collection_id = $1`, id)
+	if err != nil {
+		tx.Rollback(context.Background())
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `DELETE FROM public.collection WHERE id = $1`, id)
+	if err != nil {
+		tx.Rollback(context.Background())
+		return err
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		tx.Rollback(context.Background())
+		return err
+	}
+
+	return nil
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -55,13 +56,15 @@ func main() {
 	collServices.POST("", func(c echo.Context) error {
 		data := new(models.Collection)
 		if err := c.Bind(data); err != nil {
-			return c.JSON(400, nil)
+			fmt.Println(err.Error())
+			return echo.ErrBadRequest
 		}
 
 		err = collDB.CreateCollection(data)
 
 		if err != nil {
-			return c.JSON(422, nil)
+			fmt.Println(err.Error())
+			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
 		}
 
 		return c.JSON(200, data)
@@ -70,13 +73,15 @@ func main() {
 	collServices.PUT("", func(c echo.Context) error {
 		data := new(models.Collection)
 		if err := c.Bind(data); err != nil {
-			return c.JSON(400, nil)
+			fmt.Println(err.Error())
+			return echo.ErrBadRequest
 		}
 
 		err := collDB.UpdateCollection(data)
 
 		if err != nil {
-			return c.JSON(422, nil)
+			fmt.Println(err.Error())
+			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
 		}
 
 		return c.JSON(200, data)
@@ -85,20 +90,33 @@ func main() {
 	collServices.GET("", func(c echo.Context) error {
 		collections, err := collDB.GetCollections()
 		if err != nil {
-			return c.JSON(404, nil)
+			fmt.Println(err.Error())
+			return echo.ErrNotFound
 		}
 		return c.JSON(200, collections)
+	})
+
+	collServices.DELETE("/:collection", func(c echo.Context) error {
+		stringID := c.Param("collection")
+		err := collDB.DeleteCollection(stringID)
+		if err != nil {
+			fmt.Println(err.Error())
+			return echo.ErrNotFound
+		}
+		return c.JSON(200, nil)
 	})
 
 	bookServices.POST("", func(c echo.Context) error {
 		data := new(models.Book)
 		if err := c.Bind(data); err != nil {
-			return c.JSON(400, nil)
+			fmt.Println(err.Error())
+			return echo.ErrBadRequest
 		}
 
 		err = bookDB.CreateNewBook(data)
 		if err != nil {
-			return c.JSON(422, nil)
+			fmt.Println(err.Error())
+			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
 		}
 		return c.JSON(200, data)
 	})
@@ -106,12 +124,14 @@ func main() {
 	bookServices.PUT("", func(c echo.Context) error {
 		data := new(models.Book)
 		if err := c.Bind(data); err != nil {
-			return c.JSON(400, nil)
+			fmt.Println(err.Error())
+			return echo.ErrBadRequest
 		}
 
 		err = bookDB.UpdateBook(data)
 		if err != nil {
-			return c.JSON(422, nil)
+			fmt.Println(err.Error())
+			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
 		}
 		return c.JSON(200, data)
 	})
@@ -121,7 +141,8 @@ func main() {
 
 		books, err := bookDB.GetBooksOfCollection(stringID)
 		if err != nil {
-			return c.JSON(404, nil)
+			fmt.Println(err.Error())
+			return echo.ErrNotFound
 		}
 		return c.JSON(200, books)
 	})
@@ -129,11 +150,13 @@ func main() {
 	bookServices.POST("/search", func(c echo.Context) error {
 		data := make(map[string]string)
 		if err := c.Bind(&data); err != nil {
-			return c.JSON(400, nil)
+			fmt.Println(err.Error())
+			return echo.ErrBadRequest
 		}
 		results, err := services.SearchBook(data["title"])
 		if err != nil {
-			return c.JSON(503, nil)
+			fmt.Println(err.Error())
+			return echo.ErrServiceUnavailable
 		}
 		return c.JSON(200, results)
 	})
@@ -141,12 +164,14 @@ func main() {
 	bookServices.PUT("/delete", func(c echo.Context) error {
 		data := new(models.Book)
 		if err := c.Bind(data); err != nil {
-			return c.JSON(400, nil)
+			fmt.Println(err.Error())
+			return echo.ErrBadRequest
 		}
 
 		err = bookDB.RemoveBookFromCollection(data)
 		if err != nil {
-			return c.JSON(422, nil)
+			fmt.Println(err.Error())
+			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
 		}
 		return c.JSON(200, data)
 	})
@@ -155,18 +180,21 @@ func main() {
 		userData := new(models.User)
 		err := c.Bind(userData)
 		if err != nil {
-			return c.JSON(400, nil)
+			fmt.Println(err.Error())
+			return echo.ErrBadRequest
 		}
 		userKey, err := userDB.AuthenticateUser(userData)
 
 		if err != nil {
-			return c.JSON(401, nil)
+			fmt.Println(err.Error())
+			return echo.ErrUnauthorized
 		}
 
 		token, err := services.GenerateToken(userData.Email, userKey)
 
 		if err != nil {
-			return c.JSON(401, nil)
+			fmt.Println(err.Error())
+			return echo.ErrUnauthorized
 		}
 
 		return c.JSON(200, token)
@@ -178,7 +206,8 @@ func main() {
 		if token != "" {
 			newToken, err = services.RefreshToken(token)
 			if err != nil {
-				return c.JSON(401, nil)
+				fmt.Println(err.Error())
+				return echo.ErrUnauthorized
 			}
 		}
 		return c.JSON(200, newToken)

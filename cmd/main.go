@@ -213,5 +213,20 @@ func main() {
 		return c.JSON(200, newToken)
 	})
 
+	authServices.POST("/register", func(c echo.Context) error {
+		userData := new(models.User)
+		err := c.Bind(userData)
+		if err != nil {
+			fmt.Println(err.Error())
+			return echo.ErrBadRequest
+		}
+		err = userDB.UserWizard(userData.Email, userData.Password)
+		if err != nil {
+			fmt.Println(err.Error())
+			return echo.ErrUnprocessableEntity
+		}
+		return c.JSON(200, userData)
+	})
+
 	server.Logger.Fatal(server.Start(":5555"))
 }

@@ -21,17 +21,10 @@ func NewSQLBookContext(pool Database) *BookSQLContext {
 }
 
 func (c *BookSQLContext) CreateNewBook(book *models.Book) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
-	imgUrl, err := services.ProcessImage(book.CoverURL, book.Key)
-
-	if err != nil {
-		fmt.Println("la imagen no se pudo guardar ", err.Error())
-		imgUrl = book.CoverURL
-	}
-
-	tx, err := c.conn.Begin(context.Background())
+	tx, err := c.conn.Begin(ctx)
 
 	if err != nil {
 		return err
@@ -45,7 +38,7 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book) error {
 	if err != nil {
 		//si el error no es de tipo ErrNoRows significa que algo salió mal
 		if err != pgx.ErrNoRows {
-			tx.Rollback(context.Background())
+			tx.Rollback(ctx)
 			return err
 		} else {
 			//si es del tipo correcto solo signigica que debe de generarse un nuevo libro
@@ -59,6 +52,12 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book) error {
 	book.DateAdded = time.Now()
 
 	if insertNew {
+		imgUrl, err := services.ProcessImage(book.CoverURL, book.Key)
+
+		if err != nil {
+			fmt.Println("la imagen no se pudo guardar ", err.Error())
+			imgUrl = book.CoverURL
+		}
 		book.ID = services.GenerateUUID()
 		_, err = tx.Exec(ctx, `INSERT INTO public.book
 		(  id, title,  author,  "key",  author_key, 
@@ -78,12 +77,12 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book) error {
 		VALUES($1, $2, $3)`, book.DateAdded, book.ID, book.CollecionID)
 
 	if err != nil {
-		tx.Rollback(context.Background())
+		tx.Rollback(ctx)
 		return err
 	}
 
-	if err := tx.Commit(context.Background()); err != nil {
-		tx.Rollback(context.Background())
+	if err := tx.Commit(ctx); err != nil {
+		tx.Rollback(ctx)
 		return err
 	}
 
@@ -91,7 +90,7 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book) error {
 }
 
 func (c *BookSQLContext) UpdateBook(book *models.Book) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	_, err := c.conn.Exec(ctx, `UPDATE public.book SET 
 		title = $1,
@@ -109,7 +108,7 @@ func (c *BookSQLContext) UpdateBook(book *models.Book) error {
 }
 
 func (c *BookSQLContext) GetBooksOfCollection(collectionID string) (*[]models.Book, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	books := make([]models.Book, 0)
 
@@ -134,7 +133,7 @@ func (c *BookSQLContext) GetBooksOfCollection(collectionID string) (*[]models.Bo
 }
 
 func (c *BookSQLContext) RemoveBookFromCollection(book *models.Book) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	_, err := c.conn.Exec(ctx, `DELETE FROM public.collection_has_book WHERE book_id = $1 AND collection_id = $2`, book.ID, book.CollecionID)
 	return err

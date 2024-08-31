@@ -19,7 +19,7 @@ func NewSQLCollectionContext(pool Database) *CollectionSQLContext {
 }
 
 func (c *CollectionSQLContext) CreateCollection(collection *models.Collection) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	collection.ID = services.GenerateUUID()
 	collection.CreationDate = time.Now()
@@ -27,8 +27,9 @@ func (c *CollectionSQLContext) CreateCollection(collection *models.Collection) e
 		id,
 		name, 
 		creation_date,
-		owner_id) 
-		VALUES ($1, $2, $3, $4) RETURNING id`, collection.ID, collection.Name, collection.CreationDate, collection.OwnerID)
+		owner_id,
+		exclusive) 
+		VALUES ($1, $2, $3, $4) RETURNING id`, collection.ID, collection.Name, collection.CreationDate, collection.OwnerID, collection.Exclusive)
 
 	if err != nil {
 		return err
@@ -38,12 +39,13 @@ func (c *CollectionSQLContext) CreateCollection(collection *models.Collection) e
 }
 
 func (c *CollectionSQLContext) UpdateCollection(collection *models.Collection) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	_, err := c.conn.Exec(ctx, `UPDATE 
 		public.collection 
-		SET name = $1 
-		WHERE id=$2;`, collection.Name, collection.ID)
+		SET name = $1,
+		exclusive = $2
+		WHERE id=$3;`, collection.Name, collection.Exclusive, collection.ID)
 	return err
 }
 
@@ -51,7 +53,7 @@ func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
 
 	collections := make([]models.Collection, 0)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	rows, err := c.conn.Query(ctx, `SELECT 
@@ -59,6 +61,9 @@ func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
 		c.name, 
 		c.creation_date, 
 		c.owner_id,
+		c.exclusive,
+		c.read_col,
+		c.editable,
 		COUNT(b.collection_id) as count 
 		FROM public.collection c LEFT JOIN public.collection_has_book b 
 		on b.collection_id = c.id  
@@ -72,7 +77,9 @@ func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
 	for rows.Next() {
 		var collection models.Collection
 		err := rows.Scan(&collection.ID, &collection.Name,
-			&collection.CreationDate, &collection.OwnerID, &collection.ContainedBooks)
+			&collection.CreationDate, &collection.OwnerID,
+			&collection.Exclusive, &collection.ReadCol,
+			&collection.Editable, &collection.ContainedBooks)
 		if err != nil {
 			return nil, err
 		}
@@ -83,10 +90,10 @@ func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
 }
 
 func (c *CollectionSQLContext) DeleteCollection(id string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	tx, err := c.conn.Begin(context.Background())
+	tx, err := c.conn.Begin(ctx)
 
 	if err != nil {
 		return err
@@ -94,19 +101,19 @@ func (c *CollectionSQLContext) DeleteCollection(id string) error {
 
 	_, err = tx.Exec(ctx, `DELETE FROM public.collection_has_book WHERE collection_id = $1`, id)
 	if err != nil {
-		tx.Rollback(context.Background())
+		tx.Rollback(ctx)
 		return err
 	}
 
 	_, err = tx.Exec(ctx, `DELETE FROM public.collection WHERE id = $1`, id)
 	if err != nil {
-		tx.Rollback(context.Background())
+		tx.Rollback(ctx)
 		return err
 	}
 
-	err = tx.Commit(context.Background())
+	err = tx.Commit(ctx)
 	if err != nil {
-		tx.Rollback(context.Background())
+		tx.Rollback(ctx)
 		return err
 	}
 

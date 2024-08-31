@@ -87,8 +87,9 @@ func main() {
 		return c.JSON(200, data)
 	})
 
-	collServices.GET("", func(c echo.Context) error {
-		collections, err := collDB.GetCollections()
+	collServices.GET("/:userID", func(c echo.Context) error {
+		stringID := c.Param("userID")
+		collections, err := collDB.GetCollections(stringID)
 		if err != nil {
 			fmt.Println(err.Error())
 			return echo.ErrNotFound

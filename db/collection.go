@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/TheSgtPepper23/GreenLibrary/models"
@@ -47,7 +48,7 @@ func (c *CollectionSQLContext) UpdateCollection(collection *models.Collection) e
 	return err
 }
 
-func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
+func (c *CollectionSQLContext) GetCollections(ownerID string) (*[]models.Collection, error) {
 
 	collections := make([]models.Collection, 0)
 
@@ -64,9 +65,10 @@ func (c *CollectionSQLContext) GetCollections() (*[]models.Collection, error) {
 		c.editable,
 		COUNT(b.collection_id) as count 
 		FROM public.collection c LEFT JOIN public.collection_has_book b 
-		on b.collection_id = c.id  
+		on b.collection_id = c.id
+		WHERE c.owner_id = $1
 		GROUP BY c.id, c.name 
-		ORDER BY c.creation_date desc`)
+		ORDER BY c.creation_date desc`, ownerID)
 	if err != nil {
 		return nil, err
 	}
@@ -92,9 +94,20 @@ func (c *CollectionSQLContext) DeleteCollection(id string) error {
 	defer cancel()
 
 	tx, err := c.conn.Begin(ctx)
-
 	if err != nil {
 		return err
+	}
+
+	idEditable := true
+	err = tx.QueryRow(ctx, `SELECT editable FROM public.collection WHERE id = $1`, id).Scan(&idEditable)
+	if err != nil {
+		tx.Rollback(ctx)
+		return err
+	}
+
+	if !idEditable {
+		tx.Rollback(ctx)
+		return errors.New("collection is not editable")
 	}
 
 	_, err = tx.Exec(ctx, `DELETE FROM public.collection_has_book WHERE collection_id = $1`, id)

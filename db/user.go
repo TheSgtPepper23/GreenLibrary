@@ -61,13 +61,13 @@ func (c *UserSQLContext) UserWizard(email, password string) error {
 		return err
 	}
 
-	_, err = tx.Exec(ctx, `INSERT INTO public.collection (id, name, creation_date, owner_id, exclusive, read_col, editable) VALUES ($1, $2, $3, $4)`, services.GenerateUUID(), "Leidos", time.Now(), userId, true, true, false)
+	_, err = tx.Exec(ctx, `INSERT INTO public.collection (id, name, creation_date, owner_id, exclusive, read_col, editable) VALUES ($1, $2, $3, $4, $5, $6, $7)`, services.GenerateUUID(), "Leidos", time.Now(), userId, true, true, false)
 	if err != nil {
 		tx.Rollback(ctx)
 		return err
 	}
 
-	_, err = tx.Exec(ctx, `INSERT INTO public.collection (id, name, creation_date, owner_id, editable) VALUES ($1, $2, $3, $4)`, services.GenerateUUID(), "Por leer", time.Now(), userId, false)
+	_, err = tx.Exec(ctx, `INSERT INTO public.collection (id, name, creation_date, owner_id, editable) VALUES ($1, $2, $3, $4, $5)`, services.GenerateUUID(), "Por leer", time.Now(), userId, false)
 	if err != nil {
 		tx.Rollback(ctx)
 		return err

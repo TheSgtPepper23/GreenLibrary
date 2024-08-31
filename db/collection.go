@@ -21,15 +21,13 @@ func NewSQLCollectionContext(pool Database) *CollectionSQLContext {
 func (c *CollectionSQLContext) CreateCollection(collection *models.Collection) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	collection.ID = services.GenerateUUID()
-	collection.CreationDate = time.Now()
 	_, err := c.conn.Exec(ctx, `INSERT INTO public.collection (
 		id,
 		name, 
 		creation_date,
 		owner_id,
 		exclusive) 
-		VALUES ($1, $2, $3, $4) RETURNING id`, collection.ID, collection.Name, collection.CreationDate, collection.OwnerID, collection.Exclusive)
+		VALUES ($1, $2, $3, $4, $5)`, services.GenerateUUID(), collection.Name, time.Now(), collection.OwnerID, collection.Exclusive)
 
 	if err != nil {
 		return err

@@ -132,6 +132,13 @@ func (c *BookSQLContext) GetBooksOfCollection(collectionID string) (*[]models.Bo
 	return &books, nil
 }
 
+func (c *BookSQLContext) MoveBook(book *models.Book) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	_, err := c.conn.Exec(ctx, `UPDATE public.collection_has_book SET collection_id = $1, "comment" = $2, rating = $3 WHERE book_id = $4`, book.CollecionID, book.Comment, book.MyRating, book.ID)
+	return err
+}
+
 func (c *BookSQLContext) RemoveBookFromCollection(book *models.Book) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()

@@ -177,6 +177,22 @@ func main() {
 		return c.JSON(200, data)
 	})
 
+	bookServices.PUT("/move", func(c echo.Context) error {
+		data := new(models.Book)
+		if err := c.Bind(data); err != nil {
+			fmt.Println(err.Error())
+			return echo.ErrBadRequest
+		}
+
+		err = bookDB.MoveBook(data)
+		if err != nil {
+			fmt.Println(err.Error())
+			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
+		}
+
+		return c.JSON(200, data)
+	})
+
 	authServices.POST("/login", func(c echo.Context) error {
 		userData := new(models.User)
 		err := c.Bind(userData)

@@ -10,13 +10,14 @@ import (
 
 	"github.com/TheSgtPepper23/GreenLibrary/models"
 	"github.com/TheSgtPepper23/GreenLibrary/services"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type UserSQLContext struct {
-	conn Database
+	conn *pgxpool.Pool
 }
 
-func NewSQLUserContext(pool Database) *UserSQLContext {
+func NewSQLUserContext(pool *pgxpool.Pool) *UserSQLContext {
 	return &UserSQLContext{
 		conn: pool,
 	}

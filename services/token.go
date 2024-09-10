@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 func GenerateToken(email, userKey string) (string, error) {

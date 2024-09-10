@@ -9,6 +9,7 @@ import (
 	"github.com/TheSgtPepper23/GreenLibrary/db"
 	"github.com/TheSgtPepper23/GreenLibrary/models"
 	"github.com/TheSgtPepper23/GreenLibrary/services"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/joho/godotenv"
 	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
@@ -42,12 +43,11 @@ func main() {
 	bookDB := db.NewSQLBookContext(conn)
 	userDB := db.NewSQLUserContext(conn)
 
-	collServices := server.Group("/collection")
-	bookServices := server.Group("/book")
-	authServices := server.Group("/auth")
 	secret := os.Getenv("SECRET")
-	collServices.Use(echojwt.JWT([]byte(secret)))
-	bookServices.Use(echojwt.JWT([]byte(secret)))
+	collServices := server.Group("/collection", echojwt.JWT([]byte(secret)))
+	bookServices := server.Group("/book", echojwt.JWT([]byte(secret)))
+	authServices := server.Group("/auth")
+	adminServices := server.Group("/admin", echojwt.JWT([]byte(secret)))
 
 	server.GET("/ping", func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
@@ -114,7 +114,11 @@ func main() {
 			return echo.ErrBadRequest
 		}
 
-		err = bookDB.CreateNewBook(data)
+		user := c.Get("user").(*jwt.Token)
+		claims := user.Claims.(jwt.MapClaims)
+		fmt.Println(claims)
+
+		err = bookDB.CreateNewBook(data, claims["userKey"].(string))
 		if err != nil {
 			fmt.Println(err.Error())
 			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
@@ -230,7 +234,7 @@ func main() {
 		return c.JSON(200, newToken)
 	})
 
-	authServices.POST("/register", func(c echo.Context) error {
+	adminServices.POST("/register", func(c echo.Context) error {
 		userData := new(models.User)
 		err := c.Bind(userData)
 		if err != nil {

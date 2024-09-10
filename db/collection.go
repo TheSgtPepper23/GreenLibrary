@@ -7,13 +7,14 @@ import (
 
 	"github.com/TheSgtPepper23/GreenLibrary/models"
 	"github.com/TheSgtPepper23/GreenLibrary/services"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type CollectionSQLContext struct {
-	conn Database
+	conn *pgxpool.Pool
 }
 
-func NewSQLCollectionContext(pool Database) *CollectionSQLContext {
+func NewSQLCollectionContext(pool *pgxpool.Pool) *CollectionSQLContext {
 	return &CollectionSQLContext{
 		conn: pool,
 	}
@@ -24,10 +25,10 @@ func (c *CollectionSQLContext) CreateCollection(collection *models.Collection) e
 	defer cancel()
 	_, err := c.conn.Exec(ctx, `INSERT INTO public.collection (
 		id,
-		name, 
+		name,
 		creation_date,
 		owner_id,
-		exclusive) 
+		exclusive)
 		VALUES ($1, $2, $3, $4, $5)`, services.GenerateUUID(), collection.Name, time.Now(), collection.OwnerID, collection.Exclusive)
 
 	if err != nil {
@@ -40,8 +41,8 @@ func (c *CollectionSQLContext) CreateCollection(collection *models.Collection) e
 func (c *CollectionSQLContext) UpdateCollection(collection *models.Collection) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	_, err := c.conn.Exec(ctx, `UPDATE 
-		public.collection 
+	_, err := c.conn.Exec(ctx, `UPDATE
+		public.collection
 		SET name = $1,
 		exclusive = $2
 		WHERE id=$3;`, collection.Name, collection.Exclusive, collection.ID)
@@ -55,19 +56,19 @@ func (c *CollectionSQLContext) GetCollections(ownerID string) (*[]models.Collect
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	rows, err := c.conn.Query(ctx, `SELECT 
-		c.id, 
-		c.name, 
-		c.creation_date, 
+	rows, err := c.conn.Query(ctx, `SELECT
+		c.id,
+		c.name,
+		c.creation_date,
 		c.owner_id,
 		c.exclusive,
 		c.read_col,
 		c.editable,
-		COUNT(b.collection_id) as count 
-		FROM public.collection c LEFT JOIN public.collection_has_book b 
+		COUNT(b.collection_id) as count
+		FROM public.collection c LEFT JOIN public.collection_has_book b
 		on b.collection_id = c.id
 		WHERE c.owner_id = $1
-		GROUP BY c.id, c.name 
+		GROUP BY c.id, c.name
 		ORDER BY c.creation_date desc`, ownerID)
 	if err != nil {
 		return nil, err

@@ -116,10 +116,12 @@ func main() {
 
 		user := c.Get("user").(*jwt.Token)
 		claims := user.Claims.(jwt.MapClaims)
-		fmt.Println(claims)
 
 		err = bookDB.CreateNewBook(data, claims["userKey"].(string))
 		if err != nil {
+			if err.Error() == "book already read" {
+				return echo.NewHTTPError(http.StatusUnprocessableEntity, "El libro ya está marcado como leído")
+			}
 			fmt.Println(err.Error())
 			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
 		}
@@ -188,7 +190,10 @@ func main() {
 			return echo.ErrBadRequest
 		}
 
-		err = bookDB.MoveBook(data)
+		user := c.Get("user").(*jwt.Token)
+		claims := user.Claims.(jwt.MapClaims)
+
+		err = bookDB.MoveBook(data, claims["userKey"].(string))
 		if err != nil {
 			fmt.Println(err.Error())
 			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")

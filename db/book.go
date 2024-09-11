@@ -178,16 +178,36 @@ func (c *BookSQLContext) UpdateBook(book *models.Book) error {
 	return err
 }
 
-func (c *BookSQLContext) GetBooksOfCollection(collectionID string) (*[]models.Book, error) {
+func (c *BookSQLContext) GetBooksOfCollection(collectionID string, ammount, page int, order models.OrderOption) (*[]models.Book, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
+	//make so its not a nil value
 	books := make([]models.Book, 0)
 
-	rows, err := c.conn.Query(ctx, `SELECT  b.id, b.title, b.author, b."key", b.author_key, b.release_year,
+	query := `SELECT  b.id, b.title, b.author, b."key", b.author_key, b.release_year,
 		chb.date_added, chb.start_reading, chb.finish_reading, b.cover_url,
 		chb.rating, chb."comment", b.avg_rating, b.page_count, chb.collection_id
-		FROM public.book b left join public.collection_has_book chb on b.id = chb.book_id
-		where chb.collection_id = $1`, collectionID)
+		FROM public.book b LEFT JOIN public.collection_has_book chb ON b.id = chb.book_id
+		WHERE chb.collection_id = $1`
+
+	var orderOpt string
+	switch order {
+	case models.DateAsc:
+		orderOpt = `ORDER BY chb.date_added ASC`
+	case models.DateDesc:
+		orderOpt = `ORDER BY chb.date_added DESC`
+	case models.NameAsc:
+		orderOpt = `ORDER BY b.title ASC`
+	case models.NameDesc:
+		orderOpt = `ORDER BY b.title DESC`
+	default:
+		orderOpt = `ORDER BY chb.date_added DESC`
+	}
+	query = fmt.Sprintf("%s %s LIMIT $2 OFFSET $3", query, orderOpt)
+
+	fmt.Println(query)
+
+	rows, err := c.conn.Query(ctx, query, collectionID, ammount, (ammount * (page - 1)))
 
 	if err != nil {
 		return nil, err

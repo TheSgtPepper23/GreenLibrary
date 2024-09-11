@@ -143,10 +143,22 @@ func main() {
 		return c.JSON(200, data)
 	})
 
+	//tiene los params ammount, page, y order
 	bookServices.GET("/:collection", func(c echo.Context) error {
 		stringID := c.Param("collection")
+		ammout := c.QueryParam("ammount")
+		page := c.QueryParam("page")
+		order := c.QueryParam("order")
 
-		books, err := bookDB.GetBooksOfCollection(stringID)
+		fmt.Println("holas")
+		results, err := services.StringsToInts(ammout, page, order)
+		if err != nil {
+			fmt.Println(err.Error())
+			return echo.ErrBadRequest
+		}
+		fmt.Println(results)
+
+		books, err := bookDB.GetBooksOfCollection(stringID, results[0], results[1], models.OrderOption(results[2]))
 		if err != nil {
 			fmt.Println(err.Error())
 			return echo.ErrNotFound

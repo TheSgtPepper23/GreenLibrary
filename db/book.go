@@ -84,6 +84,18 @@ func markBookAsRead(book *models.Book, userID string, tx pgx.Tx, ctx context.Con
 	return nil
 }
 
+func updateBookImageURL(newURL, bookKey string, conn *pgxpool.Pool) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	_, err := conn.Exec(ctx, "UPDATE public.book SET cover_url = $1 WHERE key = $2", newURL, bookKey)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	return
+}
+
 // Se utiliza para agregar un nuevo libro y asignarlo a una colección
 // sa valida que el libro no esté guardado anteriormente para evitar duplicados en la base de datos
 func (c *BookSQLContext) CreateNewBook(book *models.Book, userID string) error {
@@ -115,21 +127,24 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book, userID string) error {
 			return errors.New("book already read")
 		}
 	} else {
-		imgUrl, err := services.ProcessImage(book.CoverURL, book.Key)
-		if err != nil {
-			fmt.Println("la imagen no se pudo guardar ", err.Error())
-			imgUrl = book.CoverURL
-		}
+		done := make(chan (any))
+		go services.ProcessImage(book.CoverURL, book.Key, done, func(newURL string) {
+			updateBookImageURL(newURL, book.Key, c.conn)
+		})
+
 		book.ID = services.GenerateUUID()
 		_, err = tx.Exec(ctx, `INSERT INTO public.book
 			(  id, title,  author,  "key",  author_key,
 			release_year,  cover_url, avg_rating,  page_count)
 			VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9 )`,
 			book.ID, book.Title, book.Author, book.Key, book.AuthorKey,
-			book.ReleaseYear, imgUrl, book.AVGRating, book.PageCount)
+			book.ReleaseYear, book.CoverURL, book.AVGRating, book.PageCount)
+
 		if err != nil {
+			close(done)
 			return err
 		}
+		close(done)
 	}
 
 	//si la fecha de terminado de un libro no es 0 (año 0 o literalmente null) significa que se está marcando como leído
@@ -204,8 +219,6 @@ func (c *BookSQLContext) GetBooksOfCollection(collectionID string, ammount, page
 		orderOpt = `ORDER BY chb.date_added DESC`
 	}
 	query = fmt.Sprintf("%s %s LIMIT $2 OFFSET $3", query, orderOpt)
-
-	fmt.Println(query)
 
 	rows, err := c.conn.Query(ctx, query, collectionID, ammount, (ammount * (page - 1)))
 

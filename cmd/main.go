@@ -150,13 +150,11 @@ func main() {
 		page := c.QueryParam("page")
 		order := c.QueryParam("order")
 
-		fmt.Println("holas")
 		results, err := services.StringsToInts(ammout, page, order)
 		if err != nil {
 			fmt.Println(err.Error())
 			return echo.ErrBadRequest
 		}
-		fmt.Println(results)
 
 		books, err := bookDB.GetBooksOfCollection(stringID, results[0], results[1], models.OrderOption(results[2]))
 		if err != nil {

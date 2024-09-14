@@ -1,6 +1,9 @@
 package services
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
 func StringsToInts(values ...string) ([]int, error) {
 	results := make([]int, len(values))
@@ -13,4 +16,8 @@ func StringsToInts(values ...string) ([]int, error) {
 	}
 
 	return results, nil
+}
+
+func PrintRedError(errorText string) {
+	fmt.Printf("\033[0m %s \033[31m", errorText)
 }

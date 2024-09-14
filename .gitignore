@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+main
 
 # Test binary, built with `go test -c`
 *.test
@@ -24,8 +25,9 @@ go.work.sum
 # env file
 .env
 
-# test files 
+# test files
 *_test.go
 
 #tmp
 tmp/*
+www/images

@@ -127,7 +127,7 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book, userID string) error {
 			return errors.New("book already read")
 		}
 	} else {
-		done := make(chan (any))
+		done := make(chan (bool))
 		go services.ProcessImage(book.CoverURL, book.Key, done, func(newURL string) {
 			updateBookImageURL(newURL, book.Key, c.conn)
 		})
@@ -141,9 +141,12 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book, userID string) error {
 			book.ReleaseYear, book.CoverURL, book.AVGRating, book.PageCount)
 
 		if err != nil {
-			close(done)
+			//the goroutine will proceed and fail, creating an orphan image...
+			done <- false
 			return err
 		}
+		//signals the goroutine to proceed with the update
+		done <- true
 		close(done)
 	}
 

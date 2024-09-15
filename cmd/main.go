@@ -1,268 +1,86 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/TheSgtPepper23/GreenLibrary/db"
-	"github.com/TheSgtPepper23/GreenLibrary/models"
-	"github.com/TheSgtPepper23/GreenLibrary/services"
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/joho/godotenv"
 	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
+type DatabaseContext struct {
+	CollDB *db.CollectionSQLContext
+	BookDb *db.BookSQLContext
+	UserDB *db.UserSQLContext
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file j")
 	}
+	secret := os.Getenv("SECRET")
+
 	server := echo.New()
+
+	conn, err := db.GetConnection()
+	if err != nil {
+		server.StdLogger.Fatal()
+	}
+	defer conn.Close()
+	dbContext := &DatabaseContext{
+		CollDB: db.NewSQLCollectionContext(conn),
+		BookDb: db.NewSQLBookContext(conn),
+		UserDB: db.NewSQLUserContext(conn),
+	}
+
 	server.Use(middleware.Logger())
 	server.Use(middleware.Recover())
-
 	server.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins:     []string{"http://localhost:5173", "https://andresdglez.com"}, // Allowed origins
 		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
 		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 		AllowCredentials: true, // Set to true if your API requires credentials (e.g., cookies)
 	}))
-
-	conn, err := db.GetConnection()
-	if err != nil {
-		server.StdLogger.Fatal()
-	}
-
-	defer conn.Close()
-
-	collDB := db.NewSQLCollectionContext(conn)
-	bookDB := db.NewSQLBookContext(conn)
-	userDB := db.NewSQLUserContext(conn)
-
-	secret := os.Getenv("SECRET")
-	collServices := server.Group("/collection", echojwt.JWT([]byte(secret)))
-	bookServices := server.Group("/book", echojwt.JWT([]byte(secret)))
-	authServices := server.Group("/auth")
-	adminServices := server.Group("/admin", echojwt.JWT([]byte(secret)))
+	server.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Set("dbContext", dbContext)
+			return next(c)
+		}
+	})
 
 	server.GET("/ping", func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
-	collServices.POST("", func(c echo.Context) error {
-		data := new(models.Collection)
-		if err := c.Bind(data); err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrBadRequest
-		}
+	//Collection endpoints
+	collServices := server.Group("/collection", echojwt.JWT([]byte(secret)))
+	collServices.POST("", HandlerCreateCollection)
+	collServices.PUT("", HandlerUpdateCollection)
+	collServices.GET("/:userID", HandlerGetCollections)
+	collServices.DELETE("/:collection", HandlerDeleteCollection)
 
-		err = collDB.CreateCollection(data)
+	//Book endpoints
+	bookServices := server.Group("/book", echojwt.JWT([]byte(secret)))
+	bookServices.POST("", HandlerCreateNewBook)
+	bookServices.PUT("", HandlerUpdateBook)
+	bookServices.GET("/:collection", HandlerGetCollectonBooks)
+	bookServices.POST("/search", HandlerSearchBook)
+	bookServices.PUT("/delete", HandlerRemoveFromCollection)
+	bookServices.PUT("/move", HandlerMoveBook)
 
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
-		}
+	//Auth endpoints
+	authServices := server.Group("/auth")
+	authServices.POST("/login", HandlerLogin)
+	authServices.POST("/refresh", HandlerRefreshToken)
 
-		return c.JSON(200, data)
-	})
-
-	collServices.PUT("", func(c echo.Context) error {
-		data := new(models.Collection)
-		if err := c.Bind(data); err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrBadRequest
-		}
-
-		err := collDB.UpdateCollection(data)
-
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
-		}
-
-		return c.JSON(200, data)
-	})
-
-	collServices.GET("/:userID", func(c echo.Context) error {
-		stringID := c.Param("userID")
-		collections, err := collDB.GetCollections(stringID)
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrNotFound
-		}
-		return c.JSON(200, collections)
-	})
-
-	collServices.DELETE("/:collection", func(c echo.Context) error {
-		stringID := c.Param("collection")
-		err := collDB.DeleteCollection(stringID)
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrNotFound
-		}
-		return c.JSON(200, nil)
-	})
-
-	bookServices.POST("", func(c echo.Context) error {
-		data := new(models.Book)
-		if err := c.Bind(data); err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrBadRequest
-		}
-
-		user := c.Get("user").(*jwt.Token)
-		claims := user.Claims.(jwt.MapClaims)
-
-		err = bookDB.CreateNewBook(data, claims["userKey"].(string))
-		if err != nil {
-			if err.Error() == "book already read" {
-				return echo.NewHTTPError(http.StatusUnprocessableEntity, "El libro ya está marcado como leído")
-			}
-			fmt.Println(err.Error())
-			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
-		}
-		return c.JSON(200, data)
-	})
-
-	bookServices.PUT("", func(c echo.Context) error {
-		data := new(models.Book)
-		if err := c.Bind(data); err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrBadRequest
-		}
-
-		err = bookDB.UpdateBook(data)
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
-		}
-		return c.JSON(200, data)
-	})
-
-	//tiene los params ammount, page, y order
-	bookServices.GET("/:collection", func(c echo.Context) error {
-		stringID := c.Param("collection")
-		ammout := c.QueryParam("ammount")
-		page := c.QueryParam("page")
-		order := c.QueryParam("order")
-
-		results, err := services.StringsToInts(ammout, page, order)
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrBadRequest
-		}
-
-		books, err := bookDB.GetBooksOfCollection(stringID, results[0], results[1], models.OrderOption(results[2]))
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrNotFound
-		}
-		return c.JSON(200, books)
-	})
-
-	bookServices.POST("/search", func(c echo.Context) error {
-		data := make(map[string]string)
-		if err := c.Bind(&data); err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrBadRequest
-		}
-		results, err := services.SearchBook(data["title"])
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrServiceUnavailable
-		}
-		return c.JSON(200, results)
-	})
-
-	bookServices.PUT("/delete", func(c echo.Context) error {
-		data := new(models.Book)
-		if err := c.Bind(data); err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrBadRequest
-		}
-
-		err = bookDB.RemoveBookFromCollection(data)
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
-		}
-		return c.JSON(200, data)
-	})
-
-	bookServices.PUT("/move", func(c echo.Context) error {
-		data := new(models.Book)
-		if err := c.Bind(data); err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrBadRequest
-		}
-
-		user := c.Get("user").(*jwt.Token)
-		claims := user.Claims.(jwt.MapClaims)
-
-		err = bookDB.MoveBook(data, claims["userKey"].(string))
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.NewHTTPError(http.StatusUnprocessableEntity, "No es posible realizar la operación")
-		}
-
-		return c.JSON(200, data)
-	})
-
-	authServices.POST("/login", func(c echo.Context) error {
-		userData := new(models.User)
-		err := c.Bind(userData)
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrBadRequest
-		}
-		userKey, err := userDB.AuthenticateUser(userData)
-
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrUnauthorized
-		}
-
-		token, err := services.GenerateToken(userData.Email, userKey)
-
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrUnauthorized
-		}
-
-		return c.JSON(200, token)
-	})
-
-	authServices.POST("/refresh", func(c echo.Context) error {
-		token := c.Request().Header.Get("Authorization")
-		var newToken string
-		if token != "" {
-			newToken, err = services.RefreshToken(token)
-			if err != nil {
-				fmt.Println(err.Error())
-				return echo.ErrUnauthorized
-			}
-		}
-		return c.JSON(200, newToken)
-	})
-
-	adminServices.POST("/register", func(c echo.Context) error {
-		userData := new(models.User)
-		err := c.Bind(userData)
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrBadRequest
-		}
-		err = userDB.UserWizard(userData.Email, userData.Password)
-		if err != nil {
-			fmt.Println(err.Error())
-			return echo.ErrUnprocessableEntity
-		}
-		return c.JSON(200, userData)
-	})
+	//Admin endpoints
+	adminServices := server.Group("/admin", echojwt.JWT([]byte(secret)))
+	adminServices.POST("/register", HandlerRegister)
 
 	server.Logger.Fatal(server.Start(":5555"))
 }

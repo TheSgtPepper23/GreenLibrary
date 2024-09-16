@@ -231,3 +231,16 @@ func HandlerRegister(c echo.Context) error {
 	}
 	return c.JSON(200, userData)
 }
+
+func HandlerGetLibrary(c echo.Context) error {
+	dbContext := c.Get("dbContext").(*DatabaseContext)
+
+	library, err := dbContext.BookDb.GetAllStoredBooks()
+	if err != nil {
+		fmt.Println(err.Error())
+		return echo.ErrInternalServerError
+	}
+
+	return c.JSON(http.StatusOK, library)
+
+}

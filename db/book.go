@@ -277,6 +277,45 @@ func (c *BookSQLContext) RemoveBookFromCollection(book *models.Book) error {
 	return err
 }
 
+func (c *BookSQLContext) GetAllStoredBooks() (*[]models.Book, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	//make so its not a nil value
+	books := make([]models.Book, 0)
+
+	query := `SELECT  b.id, b.title, b.author, b."key", b.author_key, b.release_year,
+		b.cover_url, b.avg_rating, b.page_count FROM public.book b`
+
+	rows, err := c.conn.Query(ctx, query)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var temp models.Book
+		err := rows.Scan(
+			&temp.ID,
+			&temp.Title,
+			&temp.Author,
+			&temp.Key,
+			&temp.AuthorKey,
+			&temp.ReleaseYear,
+			&temp.CoverURL,
+			&temp.AVGRating,
+			&temp.PageCount,
+		)
+		if err != nil {
+			return nil, err
+		}
+		books = append(books, temp)
+	}
+
+	return &books, nil
+}
+
 func scanBooks(rows pgx.Rows, target *[]models.Book) error {
 	for rows.Next() {
 

@@ -81,6 +81,7 @@ func main() {
 	//Admin endpoints
 	adminServices := server.Group("/admin", echojwt.JWT([]byte(secret)))
 	adminServices.POST("/register", HandlerRegister)
+	adminServices.GET("/library", HandlerGetLibrary)
 
 	server.Logger.Fatal(server.Start(":5555"))
 }

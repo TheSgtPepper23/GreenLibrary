@@ -32,9 +32,16 @@ func SearchBook(bookTitle string) (*[]models.Book, error) {
 	bookTitle = strings.Replace(bookTitle, " ", "+", -1)
 	foundBooks := []models.Book{}
 
-	resp, err := http.Get(os.Getenv("OPEN_LIBRARY_URL") + bookTitle)
-	baseImage := os.Getenv("IMAGE_URL")
+	req, err := http.NewRequest("GET", os.Getenv("OPEN_LIBRARY_URL")+bookTitle, nil)
+	if err != nil {
+		return nil, err
+	}
 
+	req.Header.Add("User-Agent", "bluefive.xyz:greenLibrary:andresdglez@gmail.com")
+
+	client := &http.Client{}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -45,6 +52,7 @@ func SearchBook(bookTitle string) (*[]models.Book, error) {
 	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, err
 	}
+	baseImage := os.Getenv("IMAGE_URL")
 
 	for i := 0; i < len(response.Docs); i++ {
 		if response.Docs[i].CoverEditinoKey == "" {

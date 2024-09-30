@@ -357,20 +357,18 @@ func (c *BookSQLContext) SearchUserBooks(searchTerm, collectionId, userKey strin
 			chb.start_reading, chb.finish_reading, b.cover_url, chb.rating, chb."comment", b.avg_rating,
 			b.page_count, chb.collection_id FROM public.book as b LEFT JOIN public.collection_has_book as chb ON b.id = chb.book_id `
 
-	params := make([]string, 0)
+	var firstArg string
 	if collectionId != "" {
 		query = fmt.Sprint(query, `WHERE chb.collection_id = $1
 			AND to_tsvector('english', b.title || ' ' || b.author) @@ to_tsquery('english', $2);`)
-		params = append(params, collectionId)
+		firstArg = collectionId
 	} else {
 		query = fmt.Sprint(query, `LEFT JOIN collection c on c.id = chb.collection_id
-		WHERE c.owner_id = $1
-		AND to_tsvector('english', b.title || ' ' || b.author) @@ to_tsquery('english', $2);`)
-		params = append(params, userKey)
+		WHERE c.owner_id = $1 AND to_tsvector('english', b.title || ' ' || b.author) @@ to_tsquery('english', $2);`)
+		firstArg = userKey
 	}
-	params = append(params, searchTerm)
 
-	rows, err := c.conn.Query(ctx, query, params)
+	rows, err := c.conn.Query(ctx, query, firstArg, searchTerm)
 	if err != nil {
 		return nil, err
 	}
@@ -386,8 +384,6 @@ func (c *BookSQLContext) SearchUserBooks(searchTerm, collectionId, userKey strin
 
 func scanBooks(rows pgx.Rows, target *[]models.Book) error {
 	for rows.Next() {
-
-		//se generan variables temporales para poder escanear los valores de la base de datos que pueden ser nulos
 		var (
 			dateAdded     *time.Time
 			startReading  *time.Time

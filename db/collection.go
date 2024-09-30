@@ -24,11 +24,7 @@ func (c *CollectionSQLContext) CreateCollection(collection *models.Collection) e
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	_, err := c.conn.Exec(ctx, `INSERT INTO public.collection (
-		id,
-		name,
-		creation_date,
-		owner_id,
-		exclusive)
+		id, name, creation_date, owner_id, exclusive)
 		VALUES ($1, $2, $3, $4, $5)`, services.GenerateUUID(), collection.Name, time.Now(), collection.OwnerID, collection.Exclusive)
 
 	if err != nil {
@@ -57,19 +53,9 @@ func (c *CollectionSQLContext) GetCollections(ownerID string) (*[]models.Collect
 	defer cancel()
 
 	rows, err := c.conn.Query(ctx, `SELECT
-		c.id,
-		c.name,
-		c.creation_date,
-		c.owner_id,
-		c.exclusive,
-		c.read_col,
-		c.editable,
-		COUNT(b.collection_id) as count
-		FROM public.collection c LEFT JOIN public.collection_has_book b
-		on b.collection_id = c.id
-		WHERE c.owner_id = $1
-		GROUP BY c.id, c.name
-		ORDER BY c.creation_date desc`, ownerID)
+		c.id, c.name, c.creation_date, c.owner_id, c.exclusive, c.read_col,
+		c.editable, COUNT(b.collection_id) as count FROM public.collection c LEFT JOIN public.collection_has_book b
+		on b.collection_id = c.id WHERE c.owner_id = $1 GROUP BY c.id, c.name ORDER BY c.creation_date desc`, ownerID)
 	if err != nil {
 		return nil, err
 	}

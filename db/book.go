@@ -223,9 +223,8 @@ func (c *BookSQLContext) GetBooksOfCollection(collectionID string, ammount, page
 	default:
 		orderOpt = `ORDER BY chb.date_added DESC`
 	}
-	query = fmt.Sprintf("%s %s LIMIT $2 OFFSET $3", query, orderOpt)
 
-	rows, err := c.conn.Query(ctx, query, collectionID, ammount, (ammount * (page - 1)))
+	rows, err := c.conn.Query(ctx, fmt.Sprintf("%s %s LIMIT $2 OFFSET $3", query, orderOpt), collectionID, ammount, (ammount * (page - 1)))
 
 	if err != nil {
 		return nil, err
@@ -298,17 +297,8 @@ func (c *BookSQLContext) GetAllStoredBooks() (*[]models.Book, error) {
 
 	for rows.Next() {
 		var temp models.Book
-		err := rows.Scan(
-			&temp.ID,
-			&temp.Title,
-			&temp.Author,
-			&temp.Key,
-			&temp.AuthorKey,
-			&temp.ReleaseYear,
-			&temp.CoverURL,
-			&temp.AVGRating,
-			&temp.PageCount,
-		)
+		err := rows.Scan(&temp.ID, &temp.Title, &temp.Author, &temp.Key, &temp.AuthorKey,
+			&temp.ReleaseYear, &temp.CoverURL, &temp.AVGRating, &temp.PageCount)
 		if err != nil {
 			return nil, err
 		}
@@ -357,22 +347,61 @@ func (c *BookSQLContext) SearchBookLocally(searchTerm string, targetList *[]mode
 	return
 }
 
+func (c *BookSQLContext) SearchUserBooks(searchTerm, collectionId, userKey string) (*[]models.Book, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	searchTerm = strings.ReplaceAll(searchTerm, " ", " & ")
+
+	query := `SELECT  b.id, b.title, b.author, b."key", b.author_key, b.release_year, chb.date_added,
+			chb.start_reading, chb.finish_reading, b.cover_url, chb.rating, chb."comment", b.avg_rating,
+			b.page_count, chb.collection_id FROM public.book as b LEFT JOIN public.collection_has_book as chb ON b.id = chb.book_id `
+
+	params := make([]string, 0)
+	if collectionId != "" {
+		query = fmt.Sprint(query, `WHERE chb.collection_id = $1
+			AND to_tsvector('english', b.title || ' ' || b.author) @@ to_tsquery('english', $2);`)
+		params = append(params, collectionId)
+	} else {
+		query = fmt.Sprint(query, `LEFT JOIN collection c on c.id = chb.collection_id
+		WHERE c.owner_id = $1
+		AND to_tsvector('english', b.title || ' ' || b.author) @@ to_tsquery('english', $2);`)
+		params = append(params, userKey)
+	}
+	params = append(params, searchTerm)
+
+	rows, err := c.conn.Query(ctx, query, params)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	foundBooks := make([]models.Book, 0)
+	err = scanBooks(rows, &foundBooks)
+	if err != nil {
+		return nil, err
+	}
+
+	return &foundBooks, nil
+}
+
 func scanBooks(rows pgx.Rows, target *[]models.Book) error {
 	for rows.Next() {
 
 		//se generan variables temporales para poder escanear los valores de la base de datos que pueden ser nulos
-		var dateAdded *time.Time
-		var startReading *time.Time
-		var finishReading *time.Time
-		var myRating *float32
-		var avgRating *float32
-		var comment *string
-		var temp models.Book
+		var (
+			dateAdded     *time.Time
+			startReading  *time.Time
+			finishReading *time.Time
+			myRating      *float32
+			avgRating     *float32
+			comment       *string
+			temp          models.Book
+		)
 
-		err := rows.Scan(&temp.ID, &temp.Title, &temp.Author, &temp.Key, &temp.AuthorKey,
-			&temp.ReleaseYear, &dateAdded, &startReading, &finishReading,
-			&temp.CoverURL, &myRating, &comment, &avgRating, &temp.PageCount,
-			&temp.CollecionID)
+		err := rows.Scan(&temp.ID, &temp.Title, &temp.Author, &temp.Key, &temp.AuthorKey, &temp.ReleaseYear,
+			&dateAdded, &startReading, &finishReading, &temp.CoverURL, &myRating, &comment, &avgRating,
+			&temp.PageCount, &temp.CollecionID)
+
 		if err != nil {
 			return err
 		}
@@ -381,23 +410,18 @@ func scanBooks(rows pgx.Rows, target *[]models.Book) error {
 		if dateAdded != nil {
 			temp.DateAdded = *dateAdded
 		}
-
 		if startReading != nil {
 			temp.StartReading = *startReading
 		}
-
 		if finishReading != nil {
 			temp.FinishReading = *finishReading
 		}
-
 		if myRating != nil {
 			temp.MyRating = *myRating
 		}
-
 		if avgRating != nil {
 			temp.AVGRating = *avgRating
 		}
-
 		if comment != nil {
 			temp.Comment = *comment
 		}

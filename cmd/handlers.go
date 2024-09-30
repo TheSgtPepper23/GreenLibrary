@@ -204,6 +204,27 @@ func HandlerMoveBook(c echo.Context) error {
 	return c.JSON(200, data)
 }
 
+// TODO agregar paginado
+func HandlerSearchUserBook(c echo.Context) error {
+	dbContext := c.Get("dbContext").(*DatabaseContext)
+	data := make(map[string]string)
+	if err := c.Bind(&data); err != nil {
+		fmt.Println(err.Error())
+		return echo.ErrBadRequest
+	}
+
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+
+	result, err := dbContext.BookDb.SearchUserBooks(data["searchTerm"], data["collectionID"], claims["userKey"].(string))
+	if err != nil {
+		fmt.Println(err.Error())
+		return echo.ErrNotFound
+	}
+
+	return c.JSON(200, result)
+}
+
 func HandlerLogin(c echo.Context) error {
 	dbContext := c.Get("dbContext").(*DatabaseContext)
 	userData := new(models.User)

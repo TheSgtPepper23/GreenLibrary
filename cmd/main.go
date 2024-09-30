@@ -70,6 +70,7 @@ func main() {
 	bookServices.PUT("", HandlerUpdateBook)
 	bookServices.GET("/:collection", HandlerGetCollectonBooks)
 	bookServices.POST("/search", HandlerSearchBook)
+	bookServices.POST("/search/user", HandlerSearchUserBook)
 	bookServices.PUT("/delete", HandlerRemoveFromCollection)
 	bookServices.PUT("/move", HandlerMoveBook)
 

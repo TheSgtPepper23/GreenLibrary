@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/TheSgtPepper23/GreenLibrary/models"
 	"github.com/TheSgtPepper23/GreenLibrary/services"
@@ -129,16 +131,40 @@ func HandlerGetCollectonBooks(c echo.Context) error {
 }
 
 func HandlerSearchBook(c echo.Context) error {
+	dbContext := c.Get("dbContext").(*DatabaseContext)
 	data := make(map[string]string)
 	if err := c.Bind(&data); err != nil {
 		fmt.Println(err.Error())
 		return echo.ErrBadRequest
 	}
-	results, err := services.SearchBook(data["title"])
-	if err != nil {
-		fmt.Println(err.Error())
+
+	results := make([]models.Book, 0)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	errChan := make(chan error, 2)
+
+	start := time.Now()
+	wg.Add(2)
+	go services.SearchBook(data["title"], &results, &wg, &mu, errChan)
+	go dbContext.BookDb.SearchBookLocally(data["title"], &results, &wg, &mu, errChan)
+
+	wg.Wait()
+	close(errChan)
+	fmt.Printf("total : %v", time.Since(start).Milliseconds())
+
+	hasError := false
+	for err := range errChan {
+		if err != nil {
+			fmt.Println(err.Error())
+			hasError = true
+			break
+		}
+	}
+
+	if hasError && len(results) == 0 {
 		return echo.ErrServiceUnavailable
 	}
+
 	return c.JSON(200, results)
 }
 

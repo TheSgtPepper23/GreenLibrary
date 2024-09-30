@@ -5,12 +5,12 @@ import (
 )
 
 type Collection struct {
-	ID             string    `json:"id,omitempty"`
-	Name           string    `json:"name,omitempty"`
-	CreationDate   time.Time `json:"creationDate,omitempty"`
-	ContainedBooks int       `json:"containedBooks,omitempty"`
-	OwnerID        string    `json:"ownerID,omitempty"`
-	Exclusive      bool      `json:"exclusive,omitempty"`
-	ReadCol        bool      `json:"readCol,omitempty"`
-	Editable       bool      `json:"editable,omitempty"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	CreationDate   time.Time `json:"creationDate"`
+	ContainedBooks int       `json:"containedBooks"`
+	OwnerID        string    `json:"ownerID"`
+	Exclusive      bool      `json:"exclusive"`
+	ReadCol        bool      `json:"readCol"`
+	Editable       bool      `json:"editable"`
 }

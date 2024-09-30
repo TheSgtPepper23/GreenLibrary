@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 	"unicode"
 
 	"github.com/TheSgtPepper23/GreenLibrary/models"
@@ -27,14 +29,16 @@ type doc struct {
 	AvgRating       float32  `json:"ratings_average"`
 }
 
-func SearchBook(bookTitle string) (*[]models.Book, error) {
+func SearchBook(bookTitle string, target *[]models.Book, wg *sync.WaitGroup, mu *sync.Mutex, errChan chan (error)) {
+	defer wg.Done()
+	start := time.Now()
 	bookTitle = normalizeString(bookTitle)
-	bookTitle = strings.Replace(bookTitle, " ", "+", -1)
-	foundBooks := []models.Book{}
+	bookTitle = strings.ReplaceAll(bookTitle, " ", "+")
 
 	req, err := http.NewRequest("GET", os.Getenv("OPEN_LIBRARY_URL")+bookTitle, nil)
 	if err != nil {
-		return nil, err
+		errChan <- err
+		return
 	}
 
 	req.Header.Add("User-Agent", "bluefive.xyz:greenLibrary:andresdglez@gmail.com")
@@ -43,14 +47,16 @@ func SearchBook(bookTitle string) (*[]models.Book, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		errChan <- err
+		return
 	}
 
 	defer resp.Body.Close()
 
 	var response response
 	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, err
+		errChan <- err
+		return
 	}
 	baseImage := os.Getenv("IMAGE_URL")
 
@@ -80,10 +86,13 @@ func SearchBook(bookTitle string) (*[]models.Book, error) {
 			PageCount:   currentDoc.NumberOfPages,
 			CoverURL:    buildImageURL(currentDoc.CoverEditinoKey, baseImage),
 		}
-		foundBooks = append(foundBooks, tempBook)
+		mu.Lock()
+		*target = append(*target, tempBook)
+		mu.Unlock()
 	}
 
-	return &foundBooks, nil
+	fmt.Println(time.Since(start).Milliseconds())
+	return
 }
 
 func buildImageURL(key, baseURL string) string {

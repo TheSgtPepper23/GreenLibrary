@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/TheSgtPepper23/GreenLibrary/models"
@@ -314,6 +316,45 @@ func (c *BookSQLContext) GetAllStoredBooks() (*[]models.Book, error) {
 	}
 
 	return &books, nil
+}
+
+func (c *BookSQLContext) SearchBookLocally(searchTerm string, targetList *[]models.Book, wg *sync.WaitGroup, mu *sync.Mutex, errChan chan (error)) {
+	defer wg.Done()
+	start := time.Now()
+	searchTerm = strings.ReplaceAll(searchTerm, " ", " & ")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	query := `SELECT b.id, b.title, b.author, b."key", b.author_key, b.release_year,
+		b.cover_url, b.avg_rating, b.page_count FROM public.book as b
+	 	WHERE to_tsvector('english', title || ' ' || author) @@ to_tsquery('english', $1)`
+
+	rows, err := c.conn.Query(ctx, query, searchTerm)
+
+	if err != nil {
+		errChan <- err
+		return
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var temp models.Book
+		err := rows.Scan(&temp.ID, &temp.Title, &temp.Author, &temp.Key, &temp.AuthorKey,
+			&temp.ReleaseYear, &temp.CoverURL, &temp.AVGRating, &temp.PageCount)
+
+		if err != nil {
+			fmt.Println(err.Error())
+			continue
+		}
+		temp.LocallyStored = true
+		mu.Lock()
+		*targetList = append(*targetList, temp)
+		mu.Unlock()
+	}
+	fmt.Println(time.Since(start).Milliseconds())
+	return
 }
 
 func scanBooks(rows pgx.Rows, target *[]models.Book) error {

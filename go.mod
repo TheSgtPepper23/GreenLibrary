@@ -3,13 +3,14 @@ module github.com/TheSgtPepper23/GreenLibrary
 go 1.22.6
 
 require (
+	github.com/disintegration/imaging v1.6.2
 	github.com/golang-jwt/jwt/v4 v4.4.2
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo-jwt v0.0.0-20221127215225-c84d41a71003
 	github.com/labstack/echo/v4 v4.12.0
-	golang.org/x/text v0.15.0
+	golang.org/x/text v0.18.0
 )
 
 require (
@@ -24,8 +25,9 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	golang.org/x/crypto v0.23.0 // indirect
+	golang.org/x/image v0.20.0 // indirect
 	golang.org/x/net v0.24.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 )

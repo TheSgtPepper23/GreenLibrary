@@ -23,25 +23,28 @@ func NewSQLUserContext(pool *pgxpool.Pool) *UserSQLContext {
 	}
 }
 
-func (c *UserSQLContext) AuthenticateUser(user *models.User) (string, error) {
+func (c *UserSQLContext) AuthenticateUser(user *models.User) (string, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	var recoveredPassword string
-	var id string
+	var (
+		recoveredPassword string
+		id                string
+		isAdmin           bool
+	)
 
-	err := c.conn.QueryRow(ctx, `SELECT id, password FROM public.user WHERE email = $1`, strings.ToLower(user.Email)).Scan(&id, &recoveredPassword)
+	err := c.conn.QueryRow(ctx, `SELECT id, password, admin FROM public.user WHERE email = $1`, strings.ToLower(user.Email)).Scan(&id, &recoveredPassword, &isAdmin)
 	if err != nil {
 		fmt.Println(err.Error())
-		return "", err
+		return "", false, err
 	}
 
 	hashedPass := hashPassword(user.Password)
 
 	if hashedPass != recoveredPassword {
-		return "", fmt.Errorf("passwords not match")
+		return "", false, fmt.Errorf("passwords not match")
 	}
-	return id, nil
+	return id, isAdmin, nil
 }
 
 func (c *UserSQLContext) UserWizard(email, password string) error {

@@ -83,6 +83,7 @@ func main() {
 	adminServices := server.Group("/admin", echojwt.JWT([]byte(secret)))
 	adminServices.POST("/register", HandlerRegister)
 	adminServices.GET("/library", HandlerGetLibrary)
+	adminServices.POST("/image", HandlerUploadImage)
 
 	server.Logger.Fatal(server.Start(":5555"))
 }

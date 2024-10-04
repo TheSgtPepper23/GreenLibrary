@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -233,14 +237,14 @@ func HandlerLogin(c echo.Context) error {
 		fmt.Println(err.Error())
 		return echo.ErrBadRequest
 	}
-	userKey, err := dbContext.UserDB.AuthenticateUser(userData)
+	userKey, isAdmin, err := dbContext.UserDB.AuthenticateUser(userData)
 
 	if err != nil {
 		fmt.Println(err.Error())
 		return echo.ErrUnauthorized
 	}
 
-	token, err := services.GenerateToken(userData.Email, userKey)
+	token, err := services.GenerateToken(userData.Email, userKey, isAdmin)
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -290,4 +294,44 @@ func HandlerGetLibrary(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, library)
 
+}
+
+func HandlerUploadImage(c echo.Context) error {
+	file, err := c.FormFile("bookCover")
+	if err != nil {
+		fmt.Println(err.Error())
+		return echo.ErrBadRequest
+	}
+
+	validExt := false
+	//valid types are only any variation of JPEG
+	for _, v := range [...]string{".jpeg", ".jpg"} {
+		if strings.ToLower(filepath.Ext(file.Filename)) == v {
+			validExt = true
+			break
+		}
+	}
+	if !validExt {
+		return echo.ErrBadRequest
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		fmt.Println(err.Error())
+		return echo.ErrBadRequest
+	}
+	defer src.Close()
+
+	buff := bytes.NewBuffer(nil)
+	_, err = io.Copy(buff, src)
+	if err != nil {
+		return echo.ErrInternalServerError
+	}
+	resizedImage, err := services.ResizeImage(buff.Bytes())
+	if err != nil {
+		return echo.ErrInternalServerError
+	}
+	fmt.Println(resizedImage)
+
+	return c.JSON(200, "hola")
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-func GenerateToken(email, userKey string) (string, error) {
+func GenerateToken(email, userKey string, isAdmin bool) (string, error) {
 	var signingKey = []byte(os.Getenv("SECRET"))
 
 	claims := jwt.MapClaims{
@@ -16,6 +16,7 @@ func GenerateToken(email, userKey string) (string, error) {
 		"userKey": userKey,
 		"exp":     jwt.NewNumericDate(time.Now().Add(time.Hour * 1)),
 		"iss":     "GreenLibrary",
+		"has":     isAdmin,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -41,7 +42,8 @@ func RefreshToken(tokenstring string) (string, error) {
 		if exp, ok := claims["exp"].(float64); ok && time.Until(time.Unix(int64(exp), 0)) < 10*time.Minute {
 			email := claims["email"].(string)
 			userKey := claims["userKey"].(string)
-			return GenerateToken(email, userKey)
+			isAdmin := claims["has"].(bool)
+			return GenerateToken(email, userKey, isAdmin)
 		} else {
 			return "", fmt.Errorf("token not ready to be refreshed yet")
 		}

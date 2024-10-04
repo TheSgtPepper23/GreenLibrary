@@ -1,16 +1,30 @@
 package services
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/disintegration/imaging"
 )
 
-// Although this could cause duplicated images if the file is already downloaded and the main routine fails.
-// It will be override later since the file name will be the same. Orphan images is a problem though
-// Descarga la imagen del servidor y la almacena en un directorio local, devuelve la url de la imagen y un error si lo hubo
+func ResizeImage(data []byte) ([]byte, error) {
+	imageData, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	resizedImage := imaging.Resize(imageData, 180, 0, imaging.Lanczos)
+	buff := bytes.NewBuffer(nil)
+	err = jpeg.Encode(buff, resizedImage, nil)
+	return buff.Bytes(), nil
+}
+
+// Downloads the image from the service, resize it, and store it in this server, then returns updates the data with said URL
 func ProcessImage(url, bookKey string, done chan (bool), updateFunction func(string)) {
 	result := <-done
 
@@ -40,6 +54,12 @@ func ProcessImage(url, bookKey string, done chan (bool), updateFunction func(str
 		PrintRedError(err.Error())
 		return
 	}
+
+	// resizedImg, err := ResizeImage(imgBytes)
+	// if err != nil {
+	// 	PrintRedError(err.Error())
+	// 	return
+	// }
 	//writes the image to the hard drive
 	err = os.WriteFile(imgUrl, imgBytes, 0644)
 	if err != nil {
@@ -48,4 +68,5 @@ func ProcessImage(url, bookKey string, done chan (bool), updateFunction func(str
 	}
 	finalURL := fmt.Sprint(os.Getenv("IMG_URL"), fileName)
 	updateFunction(finalURL)
+	return
 }

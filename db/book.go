@@ -163,8 +163,8 @@ func (c *BookSQLContext) CreateNewBook(book *models.Book, userID string) error {
 	} else {
 		//No se agrega una fecha para que el valor siga siendo nulo, ya que es la forma más sencilla que hay para indicar si ya fue leído
 		_, err = tx.Exec(ctx, `INSERT INTO public.collection_has_book
-			(date_added, book_id, collection_id)
-			VALUES($1, $2, $3)`, book.DateAdded, book.ID, book.CollecionID)
+			(date_added, book_id, collection_id) VALUES($1, $2, $3)`,
+			book.DateAdded, book.ID, book.CollecionID)
 
 		if err != nil {
 			tx.Rollback(ctx)
@@ -364,7 +364,7 @@ func (c *BookSQLContext) SearchUserBooks(searchTerm, collectionId, userKey strin
 		firstArg = collectionId
 	} else {
 		query = fmt.Sprint(query, `LEFT JOIN collection c on c.id = chb.collection_id
-		WHERE c.owner_id = $1 AND to_tsvector('english', b.title || ' ' || b.author) @@ to_tsquery('english', $2);`)
+			WHERE c.owner_id = $1 AND to_tsvector('english', b.title || ' ' || b.author) @@ to_tsquery('english', $2);`)
 		firstArg = userKey
 	}
 
@@ -421,7 +421,6 @@ func scanBooks(rows pgx.Rows, target *[]models.Book) error {
 		if comment != nil {
 			temp.Comment = *comment
 		}
-
 		*target = append(*target, temp)
 	}
 

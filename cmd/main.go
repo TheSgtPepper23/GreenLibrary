@@ -24,9 +24,7 @@ func main() {
 		log.Fatalf("Error loading .env file j")
 	}
 	secret := os.Getenv("SECRET")
-
 	server := echo.New()
-
 	conn, err := db.GetConnection()
 	if err != nil {
 		server.StdLogger.Fatal()
@@ -57,14 +55,14 @@ func main() {
 		return c.String(http.StatusOK, "OK")
 	})
 
-	//Collection endpoints
+	// Collection endpoints
 	collServices := server.Group("/collection", echojwt.JWT([]byte(secret)))
 	collServices.POST("", HandlerCreateCollection)
 	collServices.PUT("", HandlerUpdateCollection)
 	collServices.GET("/:userID", HandlerGetCollections)
 	collServices.DELETE("/:collection", HandlerDeleteCollection)
 
-	//Book endpoints
+	// Book endpoints
 	bookServices := server.Group("/book", echojwt.JWT([]byte(secret)))
 	bookServices.POST("", HandlerCreateNewBook)
 	bookServices.PUT("", HandlerUpdateBook)
@@ -74,12 +72,12 @@ func main() {
 	bookServices.PUT("/delete", HandlerRemoveFromCollection)
 	bookServices.PUT("/move", HandlerMoveBook)
 
-	//Auth endpoints
+	// Auth endpoints
 	authServices := server.Group("/auth")
 	authServices.POST("/login", HandlerLogin)
 	authServices.POST("/refresh", HandlerRefreshToken)
 
-	//Admin endpoints
+	// Admin endpoints
 	adminServices := server.Group("/admin", echojwt.JWT([]byte(secret)))
 	adminServices.POST("/register", HandlerRegister)
 	adminServices.GET("/library", HandlerGetLibrary)
